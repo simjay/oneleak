@@ -10,11 +10,10 @@ uv run pre-commit install
 ## Workflow
 
 ```bash
-make lint        # ruff check
-make format       # ruff format + ruff check --fix
-make typecheck    # mypy
-make test         # pytest
-make ci           # all of the above
+make format   # ruff format + ruff check --fix (mutating)
+make lint     # ruff check + ruff format --check + mypy (verify only)
+make test     # pytest, with coverage
+make ci       # lint + test + docs-build -- what CI runs
 ```
 
 `make ci` must pass before opening a PR. `pre-commit` runs a subset of the same checks automatically on `git commit`, including `oneleak scan --staged` on the repo's own changes.
@@ -35,7 +34,7 @@ Add tests to `tests/test_scanner.py` (or a focused new test file for a large bat
 
 ## Priority tiers for overlap resolution
 
-If two rules can match the same span, the higher `priority` wins (see `.plan/concepts.md` Section 8). Roughly:
+If two rules can match the same span, the higher `priority` wins (see [docs/architecture.md](docs/architecture.md#4-overlap-resolution)). Roughly:
 
 ```text
 structural anchor (PEM/JWT/connection-string): 110

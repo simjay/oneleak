@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import subprocess
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from oneleak.errors import ScanError
 from oneleak.models import ScanResult
@@ -70,8 +71,6 @@ def _staged_files(cwd: str | None = None) -> list[str]:
 
 
 def _read_working_tree_file(path: str, cwd: str | None = None) -> bytes | None:
-    from pathlib import Path
-
     full = (Path(cwd) if cwd else Path.cwd()) / path
     try:
         return full.read_bytes()
@@ -208,10 +207,7 @@ def _commit_diff_hunks(sha: str, parent: str, cwd: str | None) -> list[_CommitHu
             flush()
             added_lines, hunk_start = [], None
             target = line[4:]
-            if target == "/dev/null":
-                current_path = None
-            else:
-                current_path = target.removeprefix("b/")
+            current_path = None if target == "/dev/null" else target.removeprefix("b/")
         elif line.startswith("@@"):
             flush()
             added_lines = []

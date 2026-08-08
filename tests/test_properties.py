@@ -103,7 +103,7 @@ def _text_with_disjoint_spans(draw, max_spans=4):
 
     full_text = gaps[0]
     spans = []
-    for gap, span_text in zip(gaps[1:], span_texts):
+    for gap, span_text in zip(gaps[1:], span_texts, strict=True):
         start = len(full_text)
         full_text += span_text
         spans.append((start, len(full_text)))

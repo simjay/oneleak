@@ -35,6 +35,9 @@ print(safe.text)
 
 See [Quickstart](quickstart.md) to get started, or the [CLI Reference](cli.md) for command-line usage.
 
-## Design background
+## Documentation
 
-If you're curious about *why* oneleak is built the way it is — entropy detection, structural anchors, overlap resolution, tokenization vs. redaction, and how it compares to tools like gitleaks, detect-secrets, and trufflehog — see the project's internal planning docs (`.plan/`, not published in this repo), especially `concepts.md`.
+- **[Getting Started](quickstart.md)** — install, first scan, first sanitize
+- **[Guides](cli.md)** — CLI reference, custom rules, sanitization, the MCP server
+- **[Advanced: How Scanning & Sanitization Work](architecture.md)** — the detection pipeline stage by stage, why suppression runs before overlap resolution, the sanitization algorithm, and how git history scanning avoids breaking multi-line secrets
+- **[API Reference](api.md)** — generated from docstrings

@@ -12,6 +12,10 @@ All notable changes to this project are documented in this file. Format follows 
 - Provider rule test coverage for GitLab, Slack, Twilio, Datadog, Google, and PyPI (positive/negative/boundary cases).
 - Hypothesis property tests (`tests/test_properties.py`): Luhn, IBAN, sanitization offsets, overlap resolution, and config-schema validation.
 - `scripts/benchmark.py` / `make bench`: prints timing for 1KB/1MB text, a config-sized input, small/large synthetic repos, and `git.scan_changed()` — an observability script, not a CI gate.
+- `AGENTS.md`: repo orientation for coding agents (setup, commands, load-bearing ordering decisions, conventions).
+- `docs/architecture.md`: detailed explanation of the detection pipeline and sanitization algorithm, stage by stage — the "advanced" doc previously only in internal (untracked) notes.
+- `.github/workflows/docs.yml` + `make docs-deploy`: publishes docs to GitHub Pages on push to main. Read the Docs (the primary host) still builds via its own webhook once connected — no GitHub Action can drive that directly — but this workflow optionally triggers an RTD API build too, if `RTD_API_TOKEN`/`RTD_PROJECT_SLUG` are configured.
+- Explicit `[tool.ruff.lint] select` in `pyproject.toml` (including `I`, isort-equivalent import sorting) instead of relying on the installed ruff version's implicit default rule set.
 
 ### Fixed
 - Several provider secret regexes (`openai-api-key`, `anthropic-api-key`, `stripe-secret-key`, `stripe-restricted-key`, `pypi-token`, plus the entropy-candidate regex) used unbounded quantifiers that could run away across trailing content with no separator. Bounded them to a realistic max length.
@@ -30,6 +34,8 @@ All notable changes to this project are documented in this file. Format follows 
 
 ### Changed
 - `.plan/` (internal PRD/spec/plan/roadmap docs) is no longer tracked in git — kept locally, `.gitignore`d going forward.
+- `Makefile` consolidated from 17 targets to 13: `lint` now absorbs the old `format-check`+`typecheck`, `test` always runs with coverage (absorbing `test-cov`), `install` also installs the pre-commit hook (absorbing `precommit-install`); removed the rarely-used `all` target. `.github/workflows/ci.yml` now calls `make lint`/`make test`/`make docs-build` instead of duplicating the underlying commands.
+- Docs nav grouped into Getting Started / Guides / Advanced / Reference sections instead of one flat list.
 
 ## [0.1.0] - 2026-08-08
 

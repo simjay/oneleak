@@ -1,12 +1,14 @@
 # oneleak
 
-oneleak is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs -- agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required.
+oneleak is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs -- agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required (the one exception: `git` itself, used only by `oneleak.git`).
+
+Full docs: **[oneleak.readthedocs.io](https://oneleak.readthedocs.io/)** — [architecture](https://oneleak.readthedocs.io/architecture/) explains the detection pipeline and sanitization algorithm in detail.
 
 ## Install
 
 ```bash
-pip install -e .           # from a checkout, for now (not yet published to PyPI)
-pip install -e ".[pii-ml]" # optional Presidio-backed PII detection
+pip install oneleak
+pip install "oneleak[mcp]"   # + MCP server for agent runtimes
 ```
 
 Requires Python >= 3.11.
@@ -36,11 +38,12 @@ restored = oneleak.desanitize(result.text, result.mapping)  # restored == text
 
 `result.mapping` is only populated with `reveal=True` -- never by default.
 
-### Git
+### Git, including history
 
 ```python
-oneleak.git.scan_changed()  # working-tree changes + untracked files
-oneleak.git.scan_staged()   # staged (index) content
+oneleak.git.scan_changed()   # working-tree changes + untracked files
+oneleak.git.scan_staged()    # staged (index) content
+oneleak.git.scan_history()   # commit history -- finds secrets later removed from the tree
 ```
 
 ### Custom rules
@@ -56,6 +59,7 @@ oneleak.scan(text, rules=[MyPythonRule()])
 oneleak scan .
 oneleak scan --changed
 oneleak scan --staged
+oneleak scan --history
 oneleak scan . --json
 oneleak scan . --fail-on high
 
@@ -65,6 +69,14 @@ oneleak desanitize sanitized.txt --map mapping.json
 ```
 
 Exit codes: `0` clean, `1` findings detected, `2` execution/configuration error.
+
+## MCP server
+
+```bash
+oneleak-mcp
+```
+
+Exposes `scan_text`, `scan_path`, `sanitize_text`, `desanitize_text` as MCP tools over stdio, for agent runtimes to call directly. See [docs/mcp.md](https://oneleak.readthedocs.io/mcp/).
 
 ## Config
 
@@ -85,10 +97,11 @@ allow:
 ## Development
 
 ```bash
-uv sync
-uv run pytest
-uv run ruff check oneleak tests
-uv run mypy oneleak
+uv sync --all-extras
+make format   # ruff format + ruff check --fix
+make lint     # ruff check + ruff format --check + mypy
+make test     # pytest with coverage
+make ci       # lint + test + docs-build -- what GitHub Actions runs
 ```
 
-See `.plan/prd.md`, `.plan/spec.md`, and `.plan/plan.md` for the full design, and `.plan/concepts.md` for background on the detection techniques used.
+See [AGENTS.md](AGENTS.md) for a repo orientation aimed at coding agents, [CONTRIBUTING.md](CONTRIBUTING.md) for the human contribution guide, and [docs/](https://oneleak.readthedocs.io/) for full documentation.

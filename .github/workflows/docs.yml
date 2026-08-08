@@ -1,0 +1,49 @@
+name: Docs
+
+# Publishes docs to GitHub Pages on every push to main that touches docs
+# content. This is the only docs-publishing path actually driven by GitHub
+# Actions.
+#
+# Read the Docs (the primary host, see .readthedocs.yaml) builds itself from
+# its own webhook once the repo is connected on readthedocs.org -- no GitHub
+# Action can drive that build directly. If RTD_API_TOKEN and
+# RTD_PROJECT_SLUG secrets are set, the optional last step below also
+# triggers an RTD build via their API (https://docs.readthedocs.io/en/stable/api/v3.html),
+# for repos that want the RTD build gated on this workflow instead of purely
+# webhook-driven. Neither secret is required for GitHub Pages publishing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra docs
+
+      - name: Deploy to GitHub Pages
+        run: make docs-deploy
+
+      - name: Trigger Read the Docs build (optional)
+        if: ${{ vars.RTD_PROJECT_SLUG != '' && secrets.RTD_API_TOKEN != '' }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}" \
+            "https://readthedocs.org/api/v3/projects/${{ vars.RTD_PROJECT_SLUG }}/versions/latest/builds/"

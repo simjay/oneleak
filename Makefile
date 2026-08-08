@@ -1,27 +1,22 @@
-.PHONY: install lint format format-check typecheck test test-cov bench \
-        build publish publish-test docs-serve docs-build \
-        precommit-install clean ci all
+PY := oneleak tests scripts
+
+.PHONY: install format lint test bench build publish publish-test \
+        docs-serve docs-build docs-deploy clean ci
 
 install:
 	uv sync --all-extras
-
-lint:
-	uv run ruff check oneleak tests
+	uv run pre-commit install
 
 format:
-	uv run ruff format oneleak tests
-	uv run ruff check --fix oneleak tests
+	uv run ruff format $(PY)
+	uv run ruff check --fix $(PY)
 
-format-check:
-	uv run ruff format --check oneleak tests
-
-typecheck:
+lint:
+	uv run ruff check $(PY)
+	uv run ruff format --check $(PY)
 	uv run mypy oneleak
 
 test:
-	uv run pytest
-
-test-cov:
 	uv run pytest --cov=oneleak --cov-report=term-missing
 
 bench:
@@ -30,9 +25,9 @@ bench:
 build:
 	uv build
 
-# Manual/local publish fallback. Primary path is the tag-triggered
-# GitHub Actions trusted-publish workflow (.github/workflows/publish.yml).
-# Requires UV_PUBLISH_TOKEN in the environment.
+# Manual/local publish fallback. Primary path is the tag-triggered GitHub
+# Actions trusted-publish workflow (.github/workflows/publish.yml), which
+# needs no token. Requires UV_PUBLISH_TOKEN in the environment.
 publish: build
 	uv publish
 
@@ -45,12 +40,14 @@ docs-serve:
 docs-build:
 	uv run mkdocs build --strict
 
-precommit-install:
-	uv run pre-commit install
+# Secondary docs host (GitHub Pages) -- the one actually driven by GitHub
+# Actions (.github/workflows/docs.yml). The primary host is Read the Docs,
+# which builds automatically from its own webhook once the repo is connected
+# there (see .readthedocs.yaml); no CI step can trigger that directly.
+docs-deploy:
+	uv run mkdocs gh-deploy --force
 
 clean:
-	rm -rf dist build *.egg-info .pytest_cache .mypy_cache .ruff_cache site
+	rm -rf dist build *.egg-info .pytest_cache .mypy_cache .ruff_cache .hypothesis site
 
-ci: lint format-check typecheck test
-
-all: ci build
+ci: lint test docs-build

@@ -4,13 +4,15 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.hypothesis/
+.coverage
 *.egg-info/
 dist/
 build/
 site/
 uv.lock
+.oneleak-map.json
+*.oneleak-map.json
 
 # Internal planning docs -- not meant to be published in repo history
 .plan/
-.oneleak-map.json
-*.oneleak-map.json

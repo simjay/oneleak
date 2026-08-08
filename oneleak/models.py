@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from re import Pattern
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     SECRET = "secret"
     PII = "pii"
     SENSITIVE = "sensitive"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"

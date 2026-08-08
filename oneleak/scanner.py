@@ -13,6 +13,7 @@ import secrets
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from oneleak.config import Config, load_config
 from oneleak.detectors import (
     entropy_candidates,
     generic_assignment_candidates,
@@ -20,15 +21,9 @@ from oneleak.detectors import (
 )
 from oneleak.errors import ScanError
 from oneleak.models import Finding, Rule, ScanResult
-from oneleak.rules import (
-    ENTROPY_PRIORITY as _ENTROPY_PRIORITY,
-)
-from oneleak.rules import (
-    GENERIC_ASSIGNMENT_PRIORITY as _GENERIC_PRIORITY,
-)
-from oneleak.rules import (
-    RuleRegistry,
-)
+from oneleak.rules import ENTROPY_PRIORITY as _ENTROPY_PRIORITY
+from oneleak.rules import GENERIC_ASSIGNMENT_PRIORITY as _GENERIC_PRIORITY
+from oneleak.rules import RuleRegistry
 from oneleak.validators import VALIDATORS
 
 DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -419,8 +414,6 @@ def build_registry(rules, cfg) -> RuleRegistry:
 
 
 def resolve_config(config):
-    from oneleak.config import Config, load_config
-
     if config is None:
         return Config()
     if isinstance(config, Config):

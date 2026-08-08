@@ -59,5 +59,5 @@ If you export a mapping to disk (`oneleak sanitize --map mapping.json` on the CL
 ## Algorithm notes
 
 - Findings are replaced right-to-left (by descending start offset) so earlier replacements don't invalidate later offsets.
-- Overlapping findings are resolved *before* replacement — see how rule priority resolves overlaps in `.plan/concepts.md` Section 8.
+- Overlapping findings are resolved *before* replacement — see [how rule priority resolves overlaps](architecture.md#4-overlap-resolution) in How Scanning & Sanitization Work.
 - `desanitize()` does a plain per-placeholder string replace; placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left untouched rather than raising.

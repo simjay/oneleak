@@ -39,7 +39,11 @@ plugins:
 markdown_extensions:
   - admonition
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.inlinehilite
   - pymdownx.snippets:
       base_path: ["."]
@@ -50,11 +54,16 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md
-  - CLI Reference: cli.md
-  - Configuration: configuration.md
-  - Custom Rules: rules.md
-  - Sanitization: sanitization.md
-  - MCP Server: mcp.md
-  - API Reference: api.md
-  - Changelog: changelog.md
+  - Getting Started:
+      - Quickstart: quickstart.md
+      - Configuration: configuration.md
+  - Guides:
+      - CLI Reference: cli.md
+      - Custom Rules: rules.md
+      - Sanitization: sanitization.md
+      - MCP Server: mcp.md
+  - Advanced:
+      - How Scanning & Sanitization Work: architecture.md
+  - Reference:
+      - API Reference: api.md
+      - Changelog: changelog.md

@@ -3,8 +3,8 @@
 ## Install
 
 ```bash
-pip install -e .           # from a checkout; not yet published to PyPI
-pip install -e ".[pii-ml]" # optional Presidio-backed PII detection
+pip install oneleak
+pip install "oneleak[mcp]"   # + MCP server for agent runtimes
 ```
 
 Requires Python >= 3.11.
@@ -49,6 +49,7 @@ Repeated values reuse the same placeholder within one call. See [Sanitization](s
 ```python
 oneleak.git.scan_changed()  # working-tree changes + untracked files
 oneleak.git.scan_staged()   # staged (index) content, not the working-tree version
+oneleak.git.scan_history()  # commit history -- finds secrets later removed from the tree
 ```
 
 This is the core "did the agent just leak something" loop: scan after every edit, act on findings before continuing.
@@ -58,3 +59,5 @@ This is the core "did the agent just leak something" loop: scan after every edit
 - [CLI Reference](cli.md) for `oneleak scan` / `sanitize` / `desanitize`
 - [Configuration](configuration.md) for `.oneleak.yaml`
 - [Custom Rules](rules.md) to extend detection without forking the library
+- [MCP Server](mcp.md) to expose scan/sanitize as tools for an agent runtime
+- [How Scanning & Sanitization Work](architecture.md) for the detection pipeline in detail

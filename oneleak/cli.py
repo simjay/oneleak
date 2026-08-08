@@ -174,7 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-commits",
         type=int,
         default=5000,
-        help="With --history: cap on commits scanned, most recent first (0 = unlimited, default 5000)",
+        help="With --history: commit cap, most recent first (0 = unlimited, default 5000)",
     )
     scan_p.add_argument(
         "--all-refs",
@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     except OneleakError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR
-    except Exception as exc:  # noqa: BLE001 -- CLI top-level guard, never dump content
+    except Exception as exc:  # CLI top-level guard, never dump content
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
