@@ -9,5 +9,8 @@ dist/
 build/
 site/
 uv.lock
+
+# Internal planning docs -- not meant to be published in repo history
+.plan/
 .oneleak-map.json
 *.oneleak-map.json

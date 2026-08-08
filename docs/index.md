@@ -37,4 +37,4 @@ See [Quickstart](quickstart.md) to get started, or the [CLI Reference](cli.md) f
 
 ## Design background
 
-If you're curious about *why* oneleak is built the way it is — entropy detection, structural anchors, overlap resolution, tokenization vs. redaction, and how it compares to tools like gitleaks, detect-secrets, and trufflehog — see the project's planning docs in [`.plan/`](https://github.com/simjay/oneleak/tree/main/.plan), especially `concepts.md`.
+If you're curious about *why* oneleak is built the way it is — entropy detection, structural anchors, overlap resolution, tokenization vs. redaction, and how it compares to tools like gitleaks, detect-secrets, and trufflehog — see the project's internal planning docs (`.plan/`, not published in this repo), especially `concepts.md`.
