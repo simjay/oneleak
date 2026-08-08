@@ -1,4 +1,4 @@
-.PHONY: install lint format format-check typecheck test test-cov \
+.PHONY: install lint format format-check typecheck test test-cov bench \
         build publish publish-test docs-serve docs-build \
         precommit-install clean ci all
 
@@ -23,6 +23,9 @@ test:
 
 test-cov:
 	uv run pytest --cov=oneleak --cov-report=term-missing
+
+bench:
+	uv run python scripts/benchmark.py
 
 build:
 	uv build

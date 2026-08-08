@@ -46,9 +46,15 @@ docs = [
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.26",
 ]
+mcp = [
+    # Pinned below 2.0: the official SDK's v2.0 beta renames FastMCP to
+    # MCPServer and is not yet stable as of this writing.
+    "mcp>=1.0,<2.0",
+]
 
 [project.scripts]
 oneleak = "oneleak.cli:main"
+oneleak-mcp = "oneleak.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["oneleak"]

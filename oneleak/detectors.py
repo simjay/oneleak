@@ -84,6 +84,8 @@ _PLACEHOLDER_VALUES = {
     "<secret>",
     "example",
     "test",
+    "read",
+    "write",
 }
 
 _ASSIGNMENT_ALTERNATION = "|".join(re.escape(k) for k in GENERIC_SECRET_KEYWORDS)

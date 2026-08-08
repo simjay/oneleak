@@ -55,5 +55,6 @@ nav:
   - Configuration: configuration.md
   - Custom Rules: rules.md
   - Sanitization: sanitization.md
+  - MCP Server: mcp.md
   - API Reference: api.md
   - Changelog: changelog.md

@@ -13,27 +13,11 @@ from oneleak.config import discover_config
 from oneleak.errors import OneleakError
 from oneleak.models import Finding, MappingEntry, Severity, severity_rank
 from oneleak.sanitizer import desanitize, sanitize
-from oneleak.scanner import scan
+from oneleak.scanner import finding_to_dict, scan
 
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
 EXIT_ERROR = 2
-
-
-def _finding_to_dict(f: Finding) -> dict:
-    return {
-        "rule_id": f.rule_id,
-        "category": f.category,
-        "type": f.type,
-        "severity": f.severity,
-        "path": f.path,
-        "line": f.line,
-        "column": f.column,
-        "start": f.start,
-        "end": f.end,
-        "preview": f.preview,
-        "fingerprint": f.fingerprint,
-    }
 
 
 def _print_findings_human(findings: list[Finding]) -> None:
@@ -44,6 +28,8 @@ def _print_findings_human(findings: list[Finding]) -> None:
         location = f.path or "<text>"
         if f.line is not None:
             location = f"{location}:{f.line}"
+        if f.commit:
+            location = f"{location}@{f.commit[:8]}"
         print(f"[{f.severity}] {f.rule_id} ({f.type}) at {location} -- {f.preview}")
 
 
@@ -60,8 +46,8 @@ def _read_stdin_text() -> str:
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
-    if (args.changed or args.staged) and args.paths:
-        flag = "--changed" if args.changed else "--staged"
+    if (args.changed or args.staged or args.history) and args.paths:
+        flag = "--changed" if args.changed else "--staged" if args.staged else "--history"
         print(
             f"error: {flag} scans git content, not the given path(s); drop one or the other",
             file=sys.stderr,
@@ -71,10 +57,20 @@ def cmd_scan(args: argparse.Namespace) -> int:
     config = args.config or discover_config()
 
     findings: list[Finding] = []
+    truncated = False
     if args.changed:
         findings = git.scan_changed(config=config).findings
     elif args.staged:
         findings = git.scan_staged(config=config).findings
+    elif args.history:
+        result = git.scan_history(
+            config=config,
+            since=args.since,
+            max_commits=args.max_commits,
+            all_refs=args.all_refs,
+        )
+        findings = result.findings
+        truncated = result.truncated
     else:
         targets = args.paths or ["."]
         for target in targets:
@@ -84,6 +80,13 @@ def cmd_scan(args: argparse.Namespace) -> int:
             else:
                 findings.extend(scan(Path(target), config=config).findings)
 
+    if truncated:
+        print(
+            f"warning: history scan stopped at --max-commits {args.max_commits}; "
+            "raise it or pass --max-commits 0 for unlimited",
+            file=sys.stderr,
+        )
+
     blocking = _blocking(findings, args.fail_on)
 
     if args.json:
@@ -91,7 +94,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
         payload = {
             "safe": len(blocking) == 0,
             "risk": risk,
-            "findings": [_finding_to_dict(f) for f in findings],
+            "findings": [finding_to_dict(f) for f in findings],
         }
         print(json.dumps(payload, indent=2))
     else:
@@ -159,6 +162,25 @@ def build_parser() -> argparse.ArgumentParser:
     git_group = scan_p.add_mutually_exclusive_group()
     git_group.add_argument("--changed", action="store_true", help="Scan git working-tree changes")
     git_group.add_argument("--staged", action="store_true", help="Scan git staged (index) content")
+    git_group.add_argument(
+        "--history", action="store_true", help="Scan git commit history (see --since/--max-commits)"
+    )
+    scan_p.add_argument(
+        "--since",
+        default=None,
+        help="With --history: only commits after this date (git --since format)",
+    )
+    scan_p.add_argument(
+        "--max-commits",
+        type=int,
+        default=5000,
+        help="With --history: cap on commits scanned, most recent first (0 = unlimited, default 5000)",
+    )
+    scan_p.add_argument(
+        "--all-refs",
+        action="store_true",
+        help="With --history: scan all branches/tags, not just HEAD",
+    )
     scan_p.add_argument("--json", action="store_true", help="Emit JSON output")
     scan_p.add_argument("--fail-on", choices=[s.value for s in Severity], default=None)
     scan_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")

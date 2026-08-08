@@ -7,6 +7,7 @@ oneleak scan .
 oneleak scan config.yaml
 oneleak scan --changed
 oneleak scan --staged
+oneleak scan --history
 oneleak scan - --json          # read text from stdin
 oneleak scan . --fail-on high
 oneleak scan . --config path/to/.oneleak.yaml
@@ -14,12 +15,31 @@ oneleak scan . --config path/to/.oneleak.yaml
 
 | Flag | Description |
 |---|---|
-| `paths` (positional) | Files, directories, or `-` for stdin. Defaults to `.` if omitted. Multiple paths may be given. |
+| `paths` (positional) | Files, directories, or `-` for stdin. Defaults to `.` if omitted. Multiple paths may be given. Mutually exclusive with `--changed`/`--staged`/`--history`. |
 | `--changed` | Scan git working-tree changes + untracked files instead of `paths`. |
 | `--staged` | Scan git staged (index) content instead of `paths`. |
+| `--history` | Scan git commit history for secrets, including ones later removed from the working tree — see [Git History Scanning](#git-history-scanning) below. |
+| `--since DATE` | With `--history`: only commits after this date (passed straight to `git log --since=`). |
+| `--max-commits N` | With `--history`: cap on commits scanned, most recent first. Default `5000`. `0` = unlimited. |
+| `--all-refs` | With `--history`: scan all branches/tags, not just the current branch's history. |
 | `--json` | Emit machine-readable JSON instead of human-readable lines. |
 | `--fail-on {low,medium,high,critical}` | Only findings at or above this severity affect the exit code. Lower-severity findings still print/appear in output. |
 | `--config PATH` | Path to a `.oneleak.yaml` config file. If omitted, `.oneleak.yaml` in the current directory is auto-discovered. |
+
+### Git history scanning
+
+`oneleak scan .`, `--changed`, and `--staged` only see *current* content. A secret committed and later removed is still fully recoverable from git history unless it's been rewritten — `--history` is what catches that:
+
+```bash
+oneleak scan --history                     # current branch, most recent 5000 commits
+oneleak scan --history --since "2025-01-01"
+oneleak scan --history --max-commits 0     # no cap
+oneleak scan --history --all-refs          # every branch and tag, not just HEAD
+```
+
+Findings from `--history` include a `commit` field (the commit that introduced the secret) — shown as `path:line@abcd1234` in human output, `"commit"` in JSON. Defaulting to current-branch history capped at 5000 commits (rather than `--all-refs` with no cap) avoids a surprise multi-hour run on a large repo's first scan; if the cap truncates the scan, a warning is printed to stderr rather than failing silently.
+
+Detection works on each commit's diff (only what that commit actually added), not the whole file at every commit — so a file changed 50 times isn't rescanned in full 50 times. Multi-line formats (like a PEM private key) are still detected correctly because each diff hunk's added lines are joined into one block before scanning, not scanned line by line.
 
 ### Exit codes
 
@@ -46,13 +66,15 @@ oneleak scan . --config path/to/.oneleak.yaml
       "column": 16,
       "start": 15,
       "end": 59,
-      "confidence": null,
       "preview": "sk-p****789",
-      "fingerprint": "sec_595787508b210c47"
+      "fingerprint": "sec_595787508b210c47",
+      "commit": null
     }
   ]
 }
 ```
+
+`commit` is only set for `--history` findings; it's `null` otherwise.
 
 ## `oneleak sanitize`
 

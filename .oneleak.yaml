@@ -15,7 +15,8 @@ allow:
   paths:
     - ".plan/**"
     - "docs/**"
-    - "tests/**"   # fake-but-realistic secrets are the whole point of positive tests
+    - "tests/**"     # fake-but-realistic secrets are the whole point of positive tests
+    - "scripts/**"   # benchmark.py uses fake emails/keys as synthetic scan content
     - "README.md"
     - "CHANGELOG.md"
     - "CONTRIBUTING.md"

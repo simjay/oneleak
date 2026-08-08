@@ -59,3 +59,14 @@ class TestGenericAssignment:
         assert len(matches) == 1
         m = matches[0]
         assert text[m.start : m.end] == "supersecretvalue"
+
+    def test_github_actions_permission_scope_not_flagged(self):
+        # Regression test: "id-token: write" (a GitHub Actions OIDC permission
+        # scope, not a credential) was a real false positive found via
+        # dogfooding -- "write"/"read" are permission values, not secrets.
+        # "id-token" does match the bare "token" keyword (the hyphen is a
+        # non-word char, so \btoken\b has a boundary there, unlike "API_TOKEN"
+        # where the underscore keeps it one word) -- it's the value, not the
+        # keyword match, that must be excluded.
+        assert generic_assignment_candidates("permissions:\n  id-token: write\n") == []
+        assert generic_assignment_candidates("secret: read\n") == []

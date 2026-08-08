@@ -52,10 +52,18 @@ class Finding:
     preview: str | None = None
     fingerprint: str | None = None
 
+    # Set only by git.scan_history(): the commit that introduced this finding.
+    commit: str | None = None
+
 
 @dataclass
 class ScanResult:
     findings: list[Finding] = field(default_factory=list)
+
+    # Set by git.scan_history() when a commit/time cap cut the scan short --
+    # surfaced so truncation is never silent (see CONTRIBUTING.md / the "no
+    # silent caps" principle).
+    truncated: bool = False
 
     @property
     def safe(self) -> bool:

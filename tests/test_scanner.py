@@ -43,6 +43,79 @@ class TestProviderRules:
         result = oneleak.scan("npm_" + "a" * 36)
         assert "npm-token" in rule_ids(result)
 
+    def test_gitlab_pat(self):
+        result = oneleak.scan("glpat-" + "a" * 20)
+        assert "gitlab-pat" in rule_ids(result)
+
+    def test_gitlab_pat_boundary_too_short(self):
+        result = oneleak.scan("glpat-" + "a" * 19)
+        assert "gitlab-pat" not in rule_ids(result)
+
+    def test_slack_token(self):
+        result = oneleak.scan("xoxb-" + "a" * 10)
+        assert "slack-token" in rule_ids(result)
+
+    def test_slack_token_all_valid_prefixes(self):
+        for prefix in "baprs":
+            result = oneleak.scan(f"xox{prefix}-" + "a" * 15)
+            assert "slack-token" in rule_ids(result), f"prefix {prefix} should match"
+
+    def test_slack_token_boundary_too_short(self):
+        result = oneleak.scan("xoxb-" + "a" * 9)
+        assert "slack-token" not in rule_ids(result)
+
+    def test_slack_webhook_url(self):
+        # Assembled from parts on purpose. Written as one contiguous literal,
+        # this fixture trips GitHub's push protection, which blocks the push
+        # even though the value is obviously fake -- their webhook detector is
+        # purely structural, so there is no "clearly a test value" it accepts.
+        # A secret scanner's own fixtures have to dodge other secret scanners.
+        # Do not "simplify" this back into a single string.
+        host = "hooks.slack.com"
+        url = f"https://{host}/services/T{'0' * 8}/B{'0' * 8}/{'X' * 24}"
+        result = oneleak.scan(url)
+        assert "slack-webhook-url" in rule_ids(result)
+
+    def test_slack_webhook_url_negative_wrong_domain(self):
+        result = oneleak.scan("https://not-slack.example.com/services/T00000000/B00000000/X")
+        assert "slack-webhook-url" not in rule_ids(result)
+
+    def test_twilio_api_key(self):
+        result = oneleak.scan("SK" + "a" * 32)
+        assert "twilio-api-key" in rule_ids(result)
+
+    def test_twilio_api_key_boundary_too_short(self):
+        result = oneleak.scan("SK" + "a" * 31)
+        assert "twilio-api-key" not in rule_ids(result)
+
+    def test_datadog_api_key_with_keyword_context(self):
+        result = oneleak.scan("datadog_api_key = " + "a" * 32)
+        assert "datadog-api-key" in rule_ids(result)
+
+    def test_datadog_api_key_negative_without_keyword_context(self):
+        # Bare 32-char hex string with no "datadog"/"dd_api_key" nearby
+        # should not fire -- this rule requires keyword context precisely
+        # because a bare 32-hex-char pattern is indistinguishable from an
+        # MD5 hash otherwise.
+        result = oneleak.scan("checksum = " + "a" * 32)
+        assert "datadog-api-key" not in rule_ids(result)
+
+    def test_google_api_key(self):
+        result = oneleak.scan("AIza" + "a" * 35)
+        assert "google-api-key" in rule_ids(result)
+
+    def test_google_api_key_boundary_too_short(self):
+        result = oneleak.scan("AIza" + "a" * 34)
+        assert "google-api-key" not in rule_ids(result)
+
+    def test_pypi_token(self):
+        result = oneleak.scan("pypi-AgEIcHlwaS5vcmc" + "a" * 50)
+        assert "pypi-token" in rule_ids(result)
+
+    def test_pypi_token_boundary_too_short(self):
+        result = oneleak.scan("pypi-AgEIcHlwaS5vcmc" + "a" * 49)
+        assert "pypi-token" not in rule_ids(result)
+
     def test_azure_storage_key(self):
         # Regression test: the original pattern's trailing \b could never be
         # satisfied after `==` padding (a non-word char), so this rule was

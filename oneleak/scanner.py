@@ -141,6 +141,26 @@ def safe_preview(type_: str, value: str) -> str:
     return f"{value[:4]}****{value[-3:]}"
 
 
+def finding_to_dict(f: Finding) -> dict:
+    """JSON-serializable shape for a Finding. Shared by the CLI's --json
+    output and the MCP server's tool results, so both surfaces stay in sync.
+    """
+    return {
+        "rule_id": f.rule_id,
+        "category": f.category,
+        "type": f.type,
+        "severity": f.severity,
+        "path": f.path,
+        "line": f.line,
+        "column": f.column,
+        "start": f.start,
+        "end": f.end,
+        "preview": f.preview,
+        "fingerprint": f.fingerprint,
+        "commit": f.commit,
+    }
+
+
 # --- Candidate generation + overlap resolution -------------------------------------------------
 
 
