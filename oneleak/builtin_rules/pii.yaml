@@ -1,0 +1,54 @@
+rules:
+  - id: email
+    category: pii
+    type: email
+    severity: low
+    pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    priority: 100
+
+  - id: phone
+    category: pii
+    type: phone
+    severity: low
+    pattern: '(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}(?!\d)'
+    priority: 90
+
+  - id: ssn
+    category: pii
+    type: ssn
+    severity: high
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    validator: ssn
+    priority: 100
+
+  - id: credit-card
+    category: pii
+    type: credit_card
+    severity: high
+    pattern: '\b(?:\d[ -]?){12,18}\d\b'
+    validator: luhn
+    priority: 100
+
+  - id: ipv4
+    category: pii
+    type: ipv4
+    severity: low
+    pattern: '\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b'
+    validator: ipv4
+    priority: 80
+
+  - id: ipv6
+    category: pii
+    type: ipv6
+    severity: low
+    pattern: '\b(?:[A-Fa-f0-9]{1,4}:){2,7}[A-Fa-f0-9:]{1,4}\b'
+    validator: ipv6
+    priority: 80
+
+  - id: iban
+    category: pii
+    type: iban
+    severity: medium
+    pattern: '\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b'
+    validator: iban
+    priority: 100
