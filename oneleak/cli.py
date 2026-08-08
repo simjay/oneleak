@@ -31,7 +31,6 @@ def _finding_to_dict(f: Finding) -> dict:
         "column": f.column,
         "start": f.start,
         "end": f.end,
-        "confidence": f.confidence,
         "preview": f.preview,
         "fingerprint": f.fingerprint,
     }
@@ -61,6 +60,14 @@ def _read_stdin_text() -> str:
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
+    if (args.changed or args.staged) and args.paths:
+        flag = "--changed" if args.changed else "--staged"
+        print(
+            f"error: {flag} scans git content, not the given path(s); drop one or the other",
+            file=sys.stderr,
+        )
+        return EXIT_ERROR
+
     config = args.config or discover_config()
 
     findings: list[Finding] = []
@@ -149,8 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan_p = subparsers.add_parser("scan", help="Scan text/files/directories for sensitive data")
     scan_p.add_argument("paths", nargs="*", help="Files, directories, or '-' for stdin")
-    scan_p.add_argument("--changed", action="store_true", help="Scan git working-tree changes")
-    scan_p.add_argument("--staged", action="store_true", help="Scan git staged (index) content")
+    git_group = scan_p.add_mutually_exclusive_group()
+    git_group.add_argument("--changed", action="store_true", help="Scan git working-tree changes")
+    git_group.add_argument("--staged", action="store_true", help="Scan git staged (index) content")
     scan_p.add_argument("--json", action="store_true", help="Emit JSON output")
     scan_p.add_argument("--fail-on", choices=[s.value for s in Severity], default=None)
     scan_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")

@@ -5,7 +5,12 @@ from __future__ import annotations
 import re
 
 from oneleak.models import Finding, MappingEntry, SanitizedResult
-from oneleak.scanner import build_registry, resolve_config, resolve_text_input, scan_text
+from oneleak.scanner import (
+    build_registry,
+    resolve_config,
+    resolve_text_input,
+    scan_text_with_config,
+)
 
 _PLACEHOLDER_RE = re.compile(r"^<(?P<type>[A-Z0-9_]+)_(?P<idx>\d+)>$")
 
@@ -83,7 +88,7 @@ def sanitize(
     registry = build_registry(rules, cfg)
     text, path = resolve_text_input(content)
     assert text is not None  # skip_unreadable defaults to False: raises rather than returns None
-    findings = scan_text(text, registry, path=path)
+    findings = scan_text_with_config(text, registry, cfg, path=path)
     return sanitize_text(text, findings, reveal=reveal, seed_mapping=seed_mapping)
 
 

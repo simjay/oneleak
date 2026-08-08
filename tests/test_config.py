@@ -23,8 +23,6 @@ rule_paths:
 allow:
   paths:
     - "tests/fixtures/**"
-sanitize:
-  mode: typed
 disabled_rules:
   - some-rule
 severity_overrides:
@@ -35,7 +33,6 @@ severity_overrides:
         assert cfg.pii == {"email": True, "phone": False}
         assert cfg.rule_paths == [".oneleak/rules/"]
         assert cfg.allow_paths == ["tests/fixtures/**"]
-        assert cfg.sanitize == {"mode": "typed"}
         assert cfg.disabled_rules == ["some-rule"]
         assert cfg.severity_overrides == {"some-rule": "low"}
 
@@ -50,6 +47,15 @@ severity_overrides:
     def test_non_mapping_top_level_rejected(self):
         with pytest.raises(ConfigError):
             parse_config("- just\n- a\n- list\n")
+
+    def test_unknown_severity_override_value_rejected(self):
+        with pytest.raises(ConfigError):
+            parse_config("severity_overrides:\n  some-rule: extreme\n")
+
+    def test_removed_sanitize_field_is_now_unknown(self):
+        # `sanitize:` was removed as unused config plumbing (see .plan/v1-roadmap.md).
+        with pytest.raises(ConfigError):
+            parse_config("sanitize:\n  mode: typed\n")
 
 
 class TestDiscoverConfig:

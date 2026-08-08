@@ -111,3 +111,9 @@ class TestErrorHandling:
         out = capsys.readouterr()
         assert code == 2
         assert "error:" in out.err
+
+    def test_changed_with_paths_errors_instead_of_silently_ignoring_paths(self, capsys):
+        code = main(["scan", "somefile.txt", "--changed"])
+        out = capsys.readouterr()
+        assert code == 2
+        assert "error:" in out.err

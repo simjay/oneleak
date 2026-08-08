@@ -44,6 +44,24 @@ class TestYAMLRules:
         with pytest.raises(ConfigError):
             oneleak.scan("text", rules=[str(rule_file)])
 
+    def test_null_keywords_does_not_crash(self, tmp_path: Path):
+        # Regression test: `keywords:` with no value parses as None in YAML.
+        # This used to crash with a raw, unhandled TypeError (tuple(None) is
+        # not iterable) instead of loading cleanly with no keywords -- same
+        # as if the field had been omitted entirely.
+        rule_file = tmp_path / "null-keywords.yaml"
+        rule_file.write_text(
+            "rules:\n"
+            "  - id: null-keywords-rule\n"
+            "    category: secret\n"
+            "    type: bad\n"
+            "    severity: high\n"
+            "    pattern: 'ZZZMARKERZZZ'\n"
+            "    keywords:\n"
+        )
+        result = oneleak.scan("ZZZMARKERZZZ", rules=[str(rule_file)])
+        assert any(f.rule_id == "null-keywords-rule" for f in result.findings)
+
     def test_duplicate_rule_id_raises(self, tmp_path: Path):
         rule_file = tmp_path / "dup.yaml"
         rule_file.write_text(
@@ -90,18 +108,22 @@ class TestPythonRules:
         result_with = oneleak.scan("badge: EMP-1234567", rules=[EmployeeIdRule()])
         assert any(f.rule_id == "employee-id" for f in result_with.findings)
 
-    def test_python_rule_tuple_match(self):
+    def test_python_rule_with_nonstandard_category(self):
+        # PythonRule.category is a free-form string, not validated against
+        # Category (unlike declarative rules) -- confirms the fingerprint
+        # prefix fallback for an unrecognized category actually gets hit.
         class SimpleRule(PythonRule):
             id = "simple-rule"
-            category = "sensitive"
+            category = "custom"
             type = "simple"
             severity = "low"
 
             def detect(self, text):
                 if "MARK" in text:
                     idx = text.index("MARK")
-                    return [(idx, idx + 4)]
+                    return [RuleMatch(start=idx, end=idx + 4)]
                 return []
 
         result = oneleak.scan("here is MARK in text", rules=[SimpleRule()])
-        assert any(f.rule_id == "simple-rule" for f in result.findings)
+        finding = next(f for f in result.findings if f.rule_id == "simple-rule")
+        assert finding.fingerprint.startswith("fnd_")

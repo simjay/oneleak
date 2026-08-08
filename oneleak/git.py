@@ -12,11 +12,9 @@ from oneleak.errors import ScanError
 from oneleak.models import ScanResult
 from oneleak.scanner import (
     _is_probably_binary,
-    apply_allow_paths,
     build_registry,
-    disabled_rule_ids,
     resolve_config,
-    scan_text,
+    scan_text_with_config,
 )
 
 
@@ -31,9 +29,15 @@ def _run_git(args: list[str], cwd: str | None = None) -> str:
 
 
 def _has_head(cwd: str | None = None) -> bool:
-    result = subprocess.run(
-        ["git", "rev-parse", "--verify", "-q", "HEAD"], cwd=cwd, capture_output=True, check=False
-    )
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "-q", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ScanError("git executable not found") from exc
     return result.returncode == 0
 
 
@@ -96,7 +100,6 @@ def _scan_files(
 ) -> ScanResult:
     cfg = resolve_config(config)
     registry = build_registry(rules, cfg)
-    disabled = disabled_rule_ids(cfg)
     findings = []
     for path in paths:
         data = reader(path, cwd)
@@ -105,8 +108,8 @@ def _scan_files(
         text = _decode(data)
         if text is None:
             continue
-        findings.extend(scan_text(text, registry, path=path, disabled_rules=disabled))
-    return ScanResult(findings=apply_allow_paths(findings, cfg))
+        findings.extend(scan_text_with_config(text, registry, cfg, path=path))
+    return ScanResult(findings=findings)
 
 
 def scan_changed(*, cwd: str | None = None, rules=None, config=None) -> ScanResult:

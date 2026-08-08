@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from oneleak.errors import ConfigError
+from oneleak.models import Severity
 
 _KNOWN_TOP_LEVEL_KEYS = {
     "version",
@@ -15,12 +16,12 @@ _KNOWN_TOP_LEVEL_KEYS = {
     "pii",
     "rule_paths",
     "allow",
-    "sanitize",
     "disabled_rules",
     "severity_overrides",
 }
 
 _KNOWN_PII_KEYS = {"email", "phone", "ssn", "credit_card", "ipv4", "ipv6", "iban"}
+_KNOWN_SEVERITIES = {s.value for s in Severity}
 
 
 @dataclass
@@ -30,7 +31,6 @@ class Config:
     pii: dict[str, bool] = field(default_factory=dict)
     rule_paths: list[str] = field(default_factory=list)
     allow_paths: list[str] = field(default_factory=list)
-    sanitize: dict = field(default_factory=dict)
     disabled_rules: list[str] = field(default_factory=list)
     severity_overrides: dict[str, str] = field(default_factory=dict)
 
@@ -47,6 +47,14 @@ def _validate_pii(pii: dict, source: str) -> None:
         raise ConfigError(f"{source}: unknown pii detector(s): {', '.join(sorted(unknown))}")
 
 
+def _validate_severity_overrides(overrides: dict, source: str) -> None:
+    invalid = {v for v in overrides.values() if v not in _KNOWN_SEVERITIES}
+    if invalid:
+        raise ConfigError(
+            f"{source}: unknown severity in severity_overrides: {', '.join(sorted(invalid))}"
+        )
+
+
 def parse_config(text: str, source: str = "<config>") -> Config:
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
@@ -56,6 +64,9 @@ def parse_config(text: str, source: str = "<config>") -> Config:
     pii = data.get("pii", {}) or {}
     _validate_pii(pii, source)
 
+    severity_overrides = dict(data.get("severity_overrides", {}) or {})
+    _validate_severity_overrides(severity_overrides, source)
+
     allow = data.get("allow", {}) or {}
 
     return Config(
@@ -64,9 +75,8 @@ def parse_config(text: str, source: str = "<config>") -> Config:
         pii=dict(pii),
         rule_paths=list(data.get("rule_paths", []) or []),
         allow_paths=list(allow.get("paths", []) or []),
-        sanitize=dict(data.get("sanitize", {}) or {}),
         disabled_rules=list(data.get("disabled_rules", []) or []),
-        severity_overrides=dict(data.get("severity_overrides", {}) or {}),
+        severity_overrides=severity_overrides,
     )
 
 

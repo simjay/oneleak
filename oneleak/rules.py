@@ -47,7 +47,7 @@ def _compile_pattern(entry: dict) -> re.Pattern[str] | None:
 def build_rule(entry: dict, source: str = "<config>") -> Rule:
     _validate_entry(entry, source)
     pattern = _compile_pattern(entry)
-    keywords = tuple(entry.get("keywords", ()))
+    keywords = tuple(entry.get("keywords") or ())
 
     priority = entry.get("priority")
     if priority is None:
@@ -64,10 +64,7 @@ def build_rule(entry: dict, source: str = "<config>") -> Rule:
         severity=entry["severity"],
         pattern=pattern,
         keywords=keywords,
-        min_entropy=entry.get("min_entropy"),
         validator=entry.get("validator"),
-        include_paths=tuple(entry.get("include_paths", ())),
-        exclude_paths=tuple(entry.get("exclude_paths", ())),
         priority=priority,
     )
 

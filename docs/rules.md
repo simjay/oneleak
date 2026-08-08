@@ -31,9 +31,10 @@ result = oneleak.scan(text, rules=["company-rules.yaml"])
 | `keywords` | optional | If present, a match must also have one of these keywords nearby (same line, ~60 chars back) to count — reduces false positives on generic patterns. |
 | `validator` | optional | Name of a built-in validator to confirm the match: `luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`. |
 | `priority` | optional | Overlap-resolution tier — higher wins when two rules match the same span. Defaults to 80 if a pattern is present, 60 if keyword-only. Built-in provider/structural rules use 90–110; the built-in generic-assignment and entropy detectors use 50 and 10 respectively. |
-| `include_paths` / `exclude_paths` | optional | Parsed, but **not yet enforced** as of v0.1 — see `.plan/v1-roadmap.md`. |
 
 Declarative YAML/JSON rules can never execute arbitrary code — this is a hard security boundary, not just a convention.
+
+Path scoping is config-level only (see [Configuration](configuration.md)'s `exclude` / `allow.paths`), not per-rule — there is no `include_paths`/`exclude_paths` on individual rules.
 
 ## JSON rules
 
@@ -72,7 +73,6 @@ class EmployeeIdRule(PythonRule):
         if idx == -1:
             return []
         return [RuleMatch(start=idx, end=idx + 10)]
-        # a plain (start, end) tuple works too
 
 result = oneleak.scan(text, rules=[EmployeeIdRule()])
 ```

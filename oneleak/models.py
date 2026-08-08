@@ -49,8 +49,6 @@ class Finding:
     line: int | None = None
     column: int | None = None
 
-    confidence: float | None = None
-
     preview: str | None = None
     fingerprint: str | None = None
 
@@ -92,7 +90,6 @@ class RuleMatch:
 
     start: int
     end: int
-    confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -105,17 +102,11 @@ class Rule:
     pattern: Pattern[str] | None = None
     keywords: tuple[str, ...] = ()
 
-    min_entropy: float | None = None
     validator: str | None = None
-
-    include_paths: tuple[str, ...] = ()
-    exclude_paths: tuple[str, ...] = ()
 
     # Higher wins when two rules match the same span. Provider-specific/structured
     # rules should rank above generic patterns, which rank above entropy-only rules.
     priority: int = 0
-
-    python_rule: PythonRule | None = None
 
 
 class PythonRule:
@@ -132,5 +123,5 @@ class PythonRule:
     severity: str
     priority: int = 0
 
-    def detect(self, text: str) -> Iterable[RuleMatch | tuple[int, int]]:
+    def detect(self, text: str) -> Iterable[RuleMatch]:
         raise NotImplementedError

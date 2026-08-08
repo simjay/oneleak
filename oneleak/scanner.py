@@ -10,7 +10,7 @@ import hmac
 import os
 import re
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from oneleak.detectors import (
@@ -19,7 +19,7 @@ from oneleak.detectors import (
     regex_candidates,
 )
 from oneleak.errors import ScanError
-from oneleak.models import Finding, Rule, RuleMatch, ScanResult
+from oneleak.models import Finding, Rule, ScanResult
 from oneleak.rules import (
     ENTROPY_PRIORITY as _ENTROPY_PRIORITY,
 )
@@ -167,19 +167,15 @@ def _generate_candidates(text: str, registry: RuleRegistry) -> list[_Candidate]:
         candidates.append(_Candidate(rule=_ENTROPY_RULE, start=match.start, end=match.end))
 
     for py_rule in registry.python_rules:
+        rule = Rule(
+            id=py_rule.id,
+            category=py_rule.category,
+            type=py_rule.type,
+            severity=py_rule.severity,
+            priority=py_rule.priority,
+        )
         for py_match in py_rule.detect(text):
-            if isinstance(py_match, RuleMatch):
-                start, end = py_match.start, py_match.end
-            else:
-                start, end = py_match
-            rule = Rule(
-                id=py_rule.id,
-                category=py_rule.category,
-                type=py_rule.type,
-                severity=py_rule.severity,
-                priority=py_rule.priority,
-            )
-            candidates.append(_Candidate(rule=rule, start=start, end=end))
+            candidates.append(_Candidate(rule=rule, start=py_match.start, end=py_match.end))
 
     return candidates
 
@@ -217,12 +213,17 @@ def scan_text(
 ) -> list[Finding]:
     candidates = _generate_candidates(text, registry)
     candidates = [c for c in candidates if c.rule.id not in disabled_rules]
+    # Suppress before resolving overlaps: a rule-scoped `# oneleak: allow <id>`
+    # must only remove that one rule's candidate, leaving any other
+    # (non-allow-listed, lower-priority) rule that matches the same span free
+    # to win the overlap and still be reported. Suppressing after overlap
+    # resolution would instead silently drop the whole span whenever the
+    # *winning* candidate happened to be the suppressed one.
+    candidates = [c for c in candidates if not _is_suppressed(text, c)]
     candidates = _resolve_overlaps(candidates)
 
     findings: list[Finding] = []
     for c in candidates:
-        if _is_suppressed(text, c):
-            continue
         raw = text[c.start : c.end]
         line, col = _offset_to_line_col(text, c.start)
         fingerprint = compute_fingerprint(c.rule.id, c.rule.category, raw, key=fingerprint_key)
@@ -372,9 +373,15 @@ def resolve_text_input(content, *, skip_unreadable: bool = False) -> tuple[str |
             raise ScanError(f"cannot decode {content} as UTF-8") from exc
         return text, str(content)
     if isinstance(content, bytes):
+        if _is_probably_binary(content):
+            if skip_unreadable:
+                return None, None
+            raise ScanError("input looks binary, not text")
         try:
             return content.decode("utf-8"), None
         except UnicodeDecodeError as exc:
+            if skip_unreadable:
+                return None, None
             raise ScanError("input is not valid UTF-8") from exc
     if isinstance(content, str):
         return content, None
@@ -403,42 +410,82 @@ def resolve_config(config):
 
 def disabled_rule_ids(cfg) -> frozenset[str]:
     """Rule IDs disabled by config: explicit `disabled_rules` plus any PII
-    detector turned off via `pii: {<type>: false}`. Shared by scan() and
-    oneleak.git's scan_changed()/scan_staged() so config behaves consistently
-    across every entry point, not just the direct scan() path.
+    detector turned off via `pii: {<type>: false}`. Shared by every scan
+    entry point (scan(), oneleak.git's scan_changed()/scan_staged(), and
+    sanitize()) so config behaves consistently everywhere, not just on
+    whichever path got it first.
     """
     return frozenset(cfg.disabled_rules) | frozenset(_pii_disabled_rule_ids(cfg))
 
 
 def apply_allow_paths(findings: list[Finding], cfg) -> list[Finding]:
-    """Drop findings under `allow.paths`-matched paths. Shared for the same
-    reason as disabled_rule_ids() above.
-    """
+    """Drop findings under `allow.paths`-matched paths."""
     if not cfg.allow_paths:
         return findings
     return [f for f in findings if not (f.path and _matches_any(f.path, tuple(cfg.allow_paths)))]
+
+
+def apply_severity_overrides(findings: list[Finding], cfg) -> list[Finding]:
+    """Apply `severity_overrides: {rule_id: severity}` from config."""
+    if not cfg.severity_overrides:
+        return findings
+    return [
+        replace(f, severity=cfg.severity_overrides[f.rule_id])
+        if f.rule_id in cfg.severity_overrides
+        else f
+        for f in findings
+    ]
+
+
+def apply_config_filters(findings: list[Finding], cfg) -> list[Finding]:
+    """The full set of post-scan, config-driven transforms: severity
+    overrides, then allow-path filtering. Every entry point that produces
+    findings from a Config should route through this -- see disabled_rule_ids()
+    for why (this is the other half of the same consistency guarantee).
+    """
+    return apply_allow_paths(apply_severity_overrides(findings, cfg), cfg)
+
+
+def scan_text_with_config(
+    text: str,
+    registry: RuleRegistry,
+    cfg,
+    *,
+    path: str | None = None,
+    fingerprint_key: bytes | None = None,
+) -> list[Finding]:
+    """scan_text() plus the full config pipeline (disabled rules going in,
+    severity overrides and allow-paths coming out). The single code path
+    scan(), oneleak.git, and sanitize() all share for single-text scanning.
+    """
+    findings = scan_text(
+        text,
+        registry,
+        path=path,
+        fingerprint_key=fingerprint_key,
+        disabled_rules=disabled_rule_ids(cfg),
+    )
+    return apply_config_filters(findings, cfg)
 
 
 def scan(content, *, rules=None, config=None) -> ScanResult:
     """content: str (raw text), bytes (utf-8 text), or Path (file or directory)."""
     cfg = resolve_config(config)
     registry = build_registry(rules, cfg)
-    disabled = disabled_rule_ids(cfg)
 
     if isinstance(content, Path) and content.is_dir():
         findings = scan_path(
             content,
             registry,
             exclude=tuple(cfg.exclude),
-            disabled_rules=disabled,
+            disabled_rules=disabled_rule_ids(cfg),
         )
+        findings = apply_config_filters(findings, cfg)
     else:
         text, path = resolve_text_input(content, skip_unreadable=True)
-        findings = (
-            [] if text is None else scan_text(text, registry, path=path, disabled_rules=disabled)
-        )
+        findings = [] if text is None else scan_text_with_config(text, registry, cfg, path=path)
 
-    return ScanResult(findings=apply_allow_paths(findings, cfg))
+    return ScanResult(findings=findings)
 
 
 _PII_TYPE_TO_RULE_ID = {

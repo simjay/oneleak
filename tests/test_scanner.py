@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 import oneleak
 from oneleak.config import Config
 
@@ -40,6 +42,36 @@ class TestProviderRules:
     def test_npm_token(self):
         result = oneleak.scan("npm_" + "a" * 36)
         assert "npm-token" in rule_ids(result)
+
+    def test_azure_storage_key(self):
+        # Regression test: the original pattern's trailing \b could never be
+        # satisfied after `==` padding (a non-word char), so this rule was
+        # completely dead -- confirm it actually fires now.
+        result = oneleak.scan("AccountKey=" + "a" * 86 + "==;EndpointSuffix=core.windows.net")
+        assert "azure-storage-key" in rule_ids(result)
+
+    def test_aws_secret_access_key_span_does_not_shift_across_delimiter(self):
+        # Regression test: the old bare-40-char-charset pattern could shift
+        # left across the `=` delimiter (also a valid base64 char), capturing
+        # part of "KEY=" instead of the real secret's last character.
+        text = "AWS_SECRET_ACCESS_KEY=" + "a" * 39 + "/ next line here"
+        result = oneleak.scan(text)
+        findings = [f for f in result.findings if f.rule_id == "aws-secret-access-key"]
+        assert len(findings) == 1
+        assert text[findings[0].start : findings[0].end] == "a" * 39 + "/"
+
+    def test_openai_key_bounded_not_defeated_by_trailing_junk(self):
+        # Regression test: a naive fix (bound the quantifier but keep a
+        # trailing \b) makes this WORSE than the original bug -- it goes
+        # from "over-matches" to "matches nothing at all", since a bounded
+        # quantifier can never backtrack to a valid \b position when the
+        # word-character run continues past the cap. Must still detect the
+        # key, bounded to a sane length rather than swallowing everything.
+        text = "sk-proj-" + "a" * 20 + "X" * 500
+        result = oneleak.scan(text)
+        findings = [f for f in result.findings if f.rule_id == "openai-api-key"]
+        assert len(findings) == 1
+        assert findings[0].end - findings[0].start < 150
 
     def test_ordinary_code_has_no_findings(self):
         result = oneleak.scan("def add(a, b):\n    return a + b\n")
@@ -92,6 +124,32 @@ class TestInlineSuppression:
         text = "OPENAI_API_KEY=sk-proj-" + "a" * 20 + "  # oneleak: allow generic-secret\n"
         result = oneleak.scan(text)
         assert "openai-api-key" in rule_ids(result)
+
+    def test_scoped_suppression_of_the_overlap_winner_lets_the_loser_surface(self):
+        # Regression test: suppression must run before overlap resolution.
+        # aws-access-key-id (priority 100) wins the overlap against
+        # generic-secret (priority 50) for this span. Scoping the allow
+        # comment to aws-access-key-id specifically must not silently drop
+        # the whole span -- generic-secret should still fire in its place.
+        text = 'api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleak: allow aws-access-key-id\n'
+        result = oneleak.scan(text)
+        assert rule_ids(result) == ["generic-secret"]
+
+
+class TestBytesInput:
+    def test_non_utf8_bytes_skipped_not_raised(self):
+        # Regression test: scan(bytes) used to unconditionally raise on
+        # undecodable input, unlike an equivalent binary file on disk (which
+        # is silently skipped) -- the two input forms must behave the same.
+        result = oneleak.scan(b"\xff\xfe not utf8 \x00\x00\x00")
+        assert result.safe
+
+    def test_sanitize_bytes_still_raises(self):
+        from oneleak.errors import ScanError
+        from oneleak.sanitizer import sanitize
+
+        with pytest.raises(ScanError):
+            sanitize(b"\xff\xfe not utf8 \x00\x00\x00")
 
 
 class TestFileAndDirectoryScanning:

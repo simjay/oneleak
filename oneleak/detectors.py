@@ -121,7 +121,7 @@ def generic_assignment_candidates(text: str, min_length: int = 4) -> list[RuleMa
 
 # --- Entropy detection -----------------------------------------------------------------------
 
-_BASE64_CANDIDATE_RE = re.compile(r"[A-Za-z0-9+/_-]{20,}={0,2}")
+_BASE64_CANDIDATE_RE = re.compile(r"[A-Za-z0-9+/_-]{20,100}={0,2}")
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )

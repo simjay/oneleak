@@ -6,6 +6,21 @@ All notable changes to this project are documented in this file. Format follows 
 
 ### Added
 - Project tooling: `Makefile`, GitHub Actions CI, tag-triggered PyPI trusted-publish workflow, pre-commit dogfooding config, MkDocs + Material docs site.
+- `severity_overrides` in `.oneleak.yaml` is now applied to findings (previously parsed but unused); values are validated against the known severity levels.
+
+### Fixed
+- Several provider secret regexes (`openai-api-key`, `anthropic-api-key`, `stripe-secret-key`, `stripe-restricted-key`, `pypi-token`, plus the entropy-candidate regex) used unbounded quantifiers that could run away across trailing content with no separator. Bounded them to a realistic max length.
+- Inline `# oneleak: allow <rule-id>` suppression ran *after* overlap resolution, so scoping suppression to one rule could accidentally suppress a different, non-allow-listed rule's finding for the same span. Suppression now runs before overlap resolution.
+- `azure-storage-key`'s regex had an unsatisfiable trailing word-boundary and could never match anything.
+- `aws-secret-access-key`'s bare 40-character charset match could shift across the `=` delimiter in `KEY=value`, capturing the wrong span. Now anchored on the key name + assignment operator.
+- A YAML/JSON custom rule with `keywords:` (or other list fields) present but null crashed with an unhandled `TypeError` instead of a clean `ConfigError`.
+- `oneleak.scan(bytes)` on non-UTF8 input raised unconditionally, unlike an equivalent binary file on disk (silently skipped) — the two input forms now behave consistently.
+- `sanitize()` (like `git.scan_changed()`/`scan_staged()` before it) called the scanner directly and bypassed `.oneleak.yaml`'s `disabled_rules`/`allow.paths`/`severity_overrides`. All three entry points now share one code path (`scan_text_with_config()`), closing this class of bug for good rather than patching each call site.
+- CLI: `oneleak scan <path> --changed`/`--staged` now errors instead of silently ignoring the path argument; `--changed`/`--staged` together is now a clean argparse error instead of `--changed` silently winning.
+
+### Removed
+- Dropped several unused/never-wired fields found during a bug + simplification pass: `Rule.min_entropy`, `Rule.python_rule`, `Finding.confidence`, `RuleMatch.confidence`, `Config.sanitize`, `Rule.include_paths`/`exclude_paths`. All were parsed/declared but never consumed anywhere in the detection pipeline. `PythonRule.detect()` now only accepts `RuleMatch`, not a bare `(start, end)` tuple, removing a branch used by nothing in practice.
+- Dropped the `oneleak[pii-ml]` optional-dependency group until there's an actual adapter behind it — it was pure packaging plumbing with no code path.
 
 ## [0.1.0] - 2026-08-08
 
