@@ -101,7 +101,7 @@ def _fingerprint_key(explicit_key: bytes | None) -> bytes:
     return _SESSION_KEY
 
 
-def compute_fingerprint(
+def _compute_fingerprint(
     rule_id: str, category: str, normalized_value: str, key: bytes | None = None
 ) -> str:
     digest = hmac.new(
@@ -116,7 +116,7 @@ def compute_fingerprint(
 # --- Safe preview -------------------------------------------------------------------------------
 
 
-def safe_preview(type_: str, value: str) -> str:
+def _safe_preview(type_: str, value: str) -> str:
     if type_ == "private_key":
         return "<PRIVATE_KEY>"
     if type_ == "email" and "@" in value:
@@ -241,7 +241,7 @@ def scan_text(
     for c in candidates:
         raw = text[c.start : c.end]
         line, col = _offset_to_line_col(text, c.start)
-        fingerprint = compute_fingerprint(c.rule.id, c.rule.category, raw, key=fingerprint_key)
+        fingerprint = _compute_fingerprint(c.rule.id, c.rule.category, raw, key=fingerprint_key)
         findings.append(
             Finding(
                 rule_id=c.rule.id,
@@ -253,7 +253,7 @@ def scan_text(
                 path=path,
                 line=line,
                 column=col,
-                preview=safe_preview(c.rule.type, raw),
+                preview=_safe_preview(c.rule.type, raw),
                 fingerprint=fingerprint,
             )
         )
@@ -421,7 +421,7 @@ def resolve_config(config):
     return load_config(config)
 
 
-def disabled_rule_ids(cfg) -> frozenset[str]:
+def _disabled_rule_ids(cfg) -> frozenset[str]:
     """Rule IDs disabled by config: explicit `disabled_rules` plus any PII
     detector turned off via `pii: {<type>: false}`. Shared by every scan
     entry point (scan(), oneleak.git's scan_changed()/scan_staged(), and
@@ -431,14 +431,14 @@ def disabled_rule_ids(cfg) -> frozenset[str]:
     return frozenset(cfg.disabled_rules) | frozenset(_pii_disabled_rule_ids(cfg))
 
 
-def apply_allow_paths(findings: list[Finding], cfg) -> list[Finding]:
+def _apply_allow_paths(findings: list[Finding], cfg) -> list[Finding]:
     """Drop findings under `allow.paths`-matched paths."""
     if not cfg.allow_paths:
         return findings
     return [f for f in findings if not (f.path and _matches_any(f.path, tuple(cfg.allow_paths)))]
 
 
-def apply_severity_overrides(findings: list[Finding], cfg) -> list[Finding]:
+def _apply_severity_overrides(findings: list[Finding], cfg) -> list[Finding]:
     """Apply `severity_overrides: {rule_id: severity}` from config."""
     if not cfg.severity_overrides:
         return findings
@@ -450,13 +450,13 @@ def apply_severity_overrides(findings: list[Finding], cfg) -> list[Finding]:
     ]
 
 
-def apply_config_filters(findings: list[Finding], cfg) -> list[Finding]:
+def _apply_config_filters(findings: list[Finding], cfg) -> list[Finding]:
     """The full set of post-scan, config-driven transforms: severity
     overrides, then allow-path filtering. Every entry point that produces
-    findings from a Config should route through this -- see disabled_rule_ids()
+    findings from a Config should route through this -- see _disabled_rule_ids()
     for why (this is the other half of the same consistency guarantee).
     """
-    return apply_allow_paths(apply_severity_overrides(findings, cfg), cfg)
+    return _apply_allow_paths(_apply_severity_overrides(findings, cfg), cfg)
 
 
 def scan_text_with_config(
@@ -476,9 +476,9 @@ def scan_text_with_config(
         registry,
         path=path,
         fingerprint_key=fingerprint_key,
-        disabled_rules=disabled_rule_ids(cfg),
+        disabled_rules=_disabled_rule_ids(cfg),
     )
-    return apply_config_filters(findings, cfg)
+    return _apply_config_filters(findings, cfg)
 
 
 def scan(content, *, rules=None, config=None) -> ScanResult:
@@ -491,9 +491,9 @@ def scan(content, *, rules=None, config=None) -> ScanResult:
             content,
             registry,
             exclude=tuple(cfg.exclude),
-            disabled_rules=disabled_rule_ids(cfg),
+            disabled_rules=_disabled_rule_ids(cfg),
         )
-        findings = apply_config_filters(findings, cfg)
+        findings = _apply_config_filters(findings, cfg)
     else:
         text, path = resolve_text_input(content, skip_unreadable=True)
         findings = [] if text is None else scan_text_with_config(text, registry, cfg, path=path)

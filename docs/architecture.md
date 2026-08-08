@@ -30,7 +30,7 @@ Each regex match with a `validator` (`luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt
 
 ### 2. Disabled-rule filtering
 
-Rules turned off via `.oneleak.yaml`'s `disabled_rules` or `pii: {<type>: false}` are removed next (`disabled_rule_ids()`). This happens before suppression and overlap resolution so a disabled rule never competes for a span in the first place.
+Rules turned off via `.oneleak.yaml`'s `disabled_rules` or `pii: {<type>: false}` are removed next (`_disabled_rule_ids()`). This happens before suppression and overlap resolution so a disabled rule never competes for a span in the first place.
 
 ### 3. Suppression — *before* overlap resolution, deliberately
 
@@ -60,11 +60,11 @@ Structural-anchor formats sit *above* provider-specific patterns because a conne
 
 ### 5. Finding construction
 
-Each surviving candidate becomes a `Finding`: line/column computed from the byte offset, a masked `preview` (`safe_preview()` — type-specific, e.g. `a***@example.com` for email, `<PRIVATE_KEY>` for keys, never the raw value), and a `fingerprint` (see below). Raw sensitive values are never stored on a `Finding`.
+Each surviving candidate becomes a `Finding`: line/column computed from the byte offset, a masked `preview` (`_safe_preview()` — type-specific, e.g. `a***@example.com` for email, `<PRIVATE_KEY>` for keys, never the raw value), and a `fingerprint` (see below). Raw sensitive values are never stored on a `Finding`.
 
 ### 6. Config filters
 
-Finally, `apply_config_filters()` applies `severity_overrides` (swap a finding's severity per `.oneleak.yaml`) and `allow.paths` (drop findings under an allowed path entirely). This step — along with disabled-rule filtering — is applied through one shared function, `scan_text_with_config()`, used identically by `scan()`, `git.scan_changed()`/`scan_staged()`/`scan_history()`, and `sanitize()`. That's deliberate: earlier, each of those entry points independently reimplemented "apply the config," and each one launched with a slightly different bug (`git.py` and later `sanitize()` both shipped without `allow.paths`/`disabled_rules` support at various points before this was consolidated). One shared function means that class of bug can't reappear at a fourth call site.
+Finally, `_apply_config_filters()` applies `severity_overrides` (swap a finding's severity per `.oneleak.yaml`) and `allow.paths` (drop findings under an allowed path entirely). This step — along with disabled-rule filtering — is applied through one shared function, `scan_text_with_config()`, used identically by `scan()`, `git.scan_changed()`/`scan_staged()`/`scan_history()`, and `sanitize()`. That's deliberate: earlier, each of those entry points independently reimplemented "apply the config," and each one launched with a slightly different bug (`git.py` and later `sanitize()` both shipped without `allow.paths`/`disabled_rules` support at various points before this was consolidated). One shared function means that class of bug can't reappear at a fourth call site.
 
 ## Fingerprinting
 

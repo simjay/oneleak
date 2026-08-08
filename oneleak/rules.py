@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from oneleak.errors import ConfigError
+from oneleak.errors import ConfigError, read_text_file, yaml_error_detail
 from oneleak.models import Category, PythonRule, Rule, Severity
 
 _REQUIRED_FIELDS = ("id", "category", "type", "severity")
@@ -70,14 +70,20 @@ def build_rule(entry: dict, source: str = "<config>") -> Rule:
 
 
 def parse_yaml_rules(text: str, source: str = "<yaml>") -> list[dict]:
-    data = yaml.safe_load(text) or {}
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"{source}: invalid YAML: {yaml_error_detail(exc)}") from exc
     if not isinstance(data, dict) or "rules" not in data:
         raise ConfigError(f"{source}: expected a top-level 'rules' list")
     return data["rules"]
 
 
 def parse_json_rules(text: str, source: str = "<json>") -> list[dict]:
-    data = json.loads(text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"{source}: invalid JSON: {exc.msg} (line {exc.lineno})") from exc
     if not isinstance(data, dict) or "rules" not in data:
         raise ConfigError(f"{source}: expected a top-level 'rules' list")
     return data["rules"]
@@ -110,12 +116,12 @@ class RuleRegistry:
         self.load_entries(parse_yaml_rules(text, source), source)
 
     def load_yaml_file(self, path: str | Path) -> None:
-        path = Path(path)
-        self.load_yaml_text(path.read_text(encoding="utf-8"), source=str(path))
+        text = read_text_file(path, what="rule file")
+        self.load_yaml_text(text, source=str(path))
 
     def load_json_file(self, path: str | Path) -> None:
-        path = Path(path)
-        self.load_entries(parse_json_rules(path.read_text(encoding="utf-8"), str(path)), str(path))
+        text = read_text_file(path, what="rule file")
+        self.load_entries(parse_json_rules(text, str(path)), str(path))
 
     def load_builtin(self) -> None:
         for filename in ("secrets.yaml", "pii.yaml"):

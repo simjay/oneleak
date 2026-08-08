@@ -8,9 +8,9 @@ import os
 import sys
 from pathlib import Path
 
-from oneleak import git
+from oneleak import __version__, git
 from oneleak.config import discover_config
-from oneleak.errors import OneleakError
+from oneleak.errors import ConfigError, OneleakError, read_text_file
 from oneleak.models import Finding, MappingEntry, Severity, severity_rank
 from oneleak.sanitizer import desanitize, sanitize
 from oneleak.scanner import finding_to_dict, scan
@@ -118,13 +118,28 @@ def _write_mapping_file(path: str, mapping: dict[str, MappingEntry]) -> None:
 
 
 def _load_mapping_file(path: str) -> dict[str, MappingEntry]:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return {
-        placeholder: MappingEntry(
-            value=entry["value"], rule_id=entry["rule_id"], fingerprint=entry.get("fingerprint")
-        )
-        for placeholder, entry in data.get("mapping", {}).items()
-    }
+    text = read_text_file(path, what="mapping file")
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"{path}: invalid mapping file: {exc.msg} (line {exc.lineno})") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("mapping"), dict):
+        raise ConfigError(f"{path}: expected a top-level 'mapping' object")
+
+    mapping = {}
+    for placeholder, entry in data["mapping"].items():
+        try:
+            mapping[placeholder] = MappingEntry(
+                value=entry["value"],
+                rule_id=entry["rule_id"],
+                fingerprint=entry.get("fingerprint"),
+            )
+        except (KeyError, TypeError) as exc:
+            raise ConfigError(
+                f"{path}: mapping entry '{placeholder}' is missing or has a malformed "
+                f"'value'/'rule_id'"
+            ) from exc
+    return mapping
 
 
 def cmd_sanitize(args: argparse.Namespace) -> int:
@@ -154,7 +169,15 @@ def cmd_desanitize(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="oneleak")
+    parser = argparse.ArgumentParser(
+        prog="oneleak",
+        description=(
+            "Scan for and redact secrets and PII. Scans text, files, directories, "
+            "or git content (working tree, index, or commit history); redacts with "
+            "typed placeholders that can optionally be reversed."
+        ),
+    )
+    parser.add_argument("--version", action="version", version=f"oneleak {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     scan_p = subparsers.add_parser("scan", help="Scan text/files/directories for sensitive data")
@@ -182,18 +205,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="With --history: scan all branches/tags, not just HEAD",
     )
     scan_p.add_argument("--json", action="store_true", help="Emit JSON output")
-    scan_p.add_argument("--fail-on", choices=[s.value for s in Severity], default=None)
+    scan_p.add_argument(
+        "--fail-on",
+        choices=[s.value for s in Severity],
+        default=None,
+        help="Only findings at or above this severity affect the exit code",
+    )
     scan_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")
     scan_p.set_defaults(func=cmd_scan)
 
-    sanitize_p = subparsers.add_parser("sanitize", help="Redact sensitive data")
+    sanitize_p = subparsers.add_parser(
+        "sanitize", help="Redact secrets/PII, writing the result to stdout"
+    )
     sanitize_p.add_argument("path", help="File to sanitize, or '-' for stdin")
     sanitize_p.add_argument("--map", default=None, help="Write a placeholder->value mapping file")
     sanitize_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")
     sanitize_p.set_defaults(func=cmd_sanitize)
 
     desanitize_p = subparsers.add_parser(
-        "desanitize", help="Reverse sanitize() using a mapping file"
+        "desanitize", help="Restore values redacted by `oneleak sanitize --map`"
     )
     desanitize_p.add_argument("path", help="Sanitized file to restore, or '-' for stdin")
     desanitize_p.add_argument(

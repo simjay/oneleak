@@ -7,6 +7,13 @@ pip install oneleak
 pip install "oneleak[mcp]"   # + MCP server for agent runtimes
 ```
 
+Or from source:
+
+```bash
+git clone https://github.com/simjay/oneleak && cd oneleak
+pip install -e ".[mcp]"
+```
+
 Requires Python >= 3.11.
 
 ## Scan text
@@ -31,6 +38,10 @@ from pathlib import Path
 oneleak.scan(Path("config.yaml"))
 oneleak.scan(Path("."))
 ```
+
+!!! warning "A `str` is always content, never a path"
+
+    `oneleak.scan("config.yaml")` scans the eleven characters `config.yaml` — it does **not** open that file. Wrap filesystem input in `Path(...)`, as above. This is deliberate: guessing whether a string is a path or a payload would silently read files when you meant to scan text.
 
 Binary files and files over 10 MB are skipped automatically. `.git/`, `node_modules/`, `.venv/`, `venv/`, `__pycache__/`, `dist/`, and `build/` are excluded by default.
 

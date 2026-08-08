@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from oneleak.errors import ConfigError
+from oneleak.errors import ConfigError, read_text_file, yaml_error_detail
 from oneleak.models import Severity
 
 _KNOWN_TOP_LEVEL_KEYS = {
@@ -56,7 +56,10 @@ def _validate_severity_overrides(overrides: dict, source: str) -> None:
 
 
 def parse_config(text: str, source: str = "<config>") -> Config:
-    data = yaml.safe_load(text) or {}
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"{source}: invalid YAML: {yaml_error_detail(exc)}") from exc
     if not isinstance(data, dict):
         raise ConfigError(f"{source}: expected a YAML mapping at the top level")
     _validate_top_level(data, source)
@@ -81,8 +84,8 @@ def parse_config(text: str, source: str = "<config>") -> Config:
 
 
 def load_config(path: str | Path) -> Config:
-    path = Path(path)
-    return parse_config(path.read_text(encoding="utf-8"), source=str(path))
+    text = read_text_file(path, what="config file")
+    return parse_config(text, source=str(path))
 
 
 DEFAULT_CONFIG_FILENAME = ".oneleak.yaml"

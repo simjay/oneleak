@@ -59,8 +59,8 @@ Same shape, JSON-encoded:
 For detection logic that can't be expressed as a regex (a proprietary checksum, an internal ID format):
 
 ```python
-from oneleak import PythonRule
-from oneleak.models import RuleMatch
+import oneleak
+from oneleak import PythonRule, RuleMatch
 
 class EmployeeIdRule(PythonRule):
     id = "employee-id"

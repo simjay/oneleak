@@ -1,4 +1,19 @@
-"""Exception hierarchy. Error messages must never dump raw sensitive content."""
+"""Exception hierarchy, plus helpers for turning low-level failures into clean
+oneleak errors.
+
+Error messages must never dump raw sensitive content -- and, just as
+importantly for anyone running oneleak in CI, they must never surface a raw
+Python exception type. `cli.py::main()` renders any `OneleakError` as a plain
+`error: <message>`; anything else falls through to a generic handler that
+prints the exception class name. So raising the right type here *is* the
+user-facing error-message fix.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
 
 
 class OneleakError(Exception):
@@ -11,3 +26,31 @@ class ConfigError(OneleakError):
 
 class ScanError(OneleakError):
     """Runtime scanning failures (unreadable path, etc.)."""
+
+
+def read_text_file(path: str | Path, *, what: str) -> str:
+    """Read a UTF-8 text file, raising ConfigError instead of OSError.
+
+    `what` names the kind of file for the message, e.g. "config file".
+    """
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ConfigError(f"{what} not found: {path}") from exc
+    except OSError as exc:
+        raise ConfigError(f"cannot read {what} {path}: {exc.strerror}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"{what} {path} is not valid UTF-8") from exc
+
+
+def yaml_error_detail(exc: yaml.YAMLError) -> str:
+    """Condense a PyYAML error into one line.
+
+    Raw `str(a YAMLError)` is a multi-line dump with a caret diagram; that is
+    fine in a traceback and terrible in a CLI error line.
+    """
+    problem = getattr(exc, "problem", None)
+    mark = getattr(exc, "problem_mark", None)
+    if problem and mark is not None:
+        return f"{problem} (line {mark.line + 1}, column {mark.column + 1})"
+    return " ".join(str(exc).split())

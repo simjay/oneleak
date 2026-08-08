@@ -1,6 +1,7 @@
 """oneleak: a lightweight, pure-Python sensitive-data scanner and sanitizer."""
 
 from oneleak import git
+from oneleak.config import Config
 from oneleak.errors import ConfigError, OneleakError, ScanError
 from oneleak.models import (
     Category,
@@ -8,6 +9,7 @@ from oneleak.models import (
     MappingEntry,
     PythonRule,
     Rule,
+    RuleMatch,
     SanitizedResult,
     ScanResult,
     Severity,
@@ -19,12 +21,14 @@ __version__ = "0.1.0"
 
 __all__ = [
     "Category",
+    "Config",
     "ConfigError",
     "Finding",
     "MappingEntry",
     "OneleakError",
     "PythonRule",
     "Rule",
+    "RuleMatch",
     "SanitizedResult",
     "ScanError",
     "ScanResult",

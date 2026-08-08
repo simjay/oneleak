@@ -11,6 +11,13 @@ pip install oneleak
 pip install "oneleak[mcp]"   # + MCP server for agent runtimes
 ```
 
+Or from source:
+
+```bash
+git clone https://github.com/simjay/oneleak && cd oneleak
+pip install -e ".[mcp]"
+```
+
 Requires Python >= 3.11.
 
 ## Python API

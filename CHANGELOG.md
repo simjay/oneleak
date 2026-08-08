@@ -32,8 +32,19 @@ All notable changes to this project are documented in this file. Format follows 
 - Dropped several unused/never-wired fields found during a bug + simplification pass: `Rule.min_entropy`, `Rule.python_rule`, `Finding.confidence`, `RuleMatch.confidence`, `Config.sanitize`, `Rule.include_paths`/`exclude_paths`. All were parsed/declared but never consumed anywhere in the detection pipeline. `PythonRule.detect()` now only accepts `RuleMatch`, not a bare `(start, end)` tuple, removing a branch used by nothing in practice.
 - Dropped the `oneleak[pii-ml]` optional-dependency group until there's an actual adapter behind it — it was pure packaging plumbing with no code path.
 
+- `oneleak --version`, and a real `description` on `oneleak --help` (which previously said nothing about what the tool does).
+- `Config` and `RuleMatch` are now exported from the top-level `oneleak` namespace. Previously the documented custom-rule example needed two import paths (`from oneleak import PythonRule` + `from oneleak.models import RuleMatch`) — you could not implement the exported `PythonRule` without a non-exported type.
+- `docs/configuration.md` documents how to adopt oneleak on a repo that already has findings, and states plainly that baseline files are not implemented yet.
+
+### Fixed
+- **Every "bad input file" path leaked a raw Python exception type to the user.** `--config missing.yaml` printed `error: FileNotFoundError: [Errno 2]...`; a malformed `.oneleak.yaml` printed a multi-line `ParserError` dump; a malformed `--map` file printed `JSONDecodeError`; a mapping file missing a key printed `KeyError: 'rule_id'`. All now raise `ConfigError` with a message that names the offending file and the actual problem. Fixed at the source (`config.py`, `rules.py`, `cli.py`) rather than in the CLI's catch-all, so the Python API benefits too — `oneleak.scan(text, config="missing.yaml")` previously raised `FileNotFoundError`.
+- `oneleak scan --staged` outside a git repository dumped git's entire multi-thousand-character usage text (outside a repo, `git diff --cached` falls back to `--no-index` mode where `--cached` is not a valid option). All three git modes now fail fast and identically with `error: not a git repository`, and any other git failure is truncated rather than echoed in full.
+- Git errors no longer echo back the internal command oneleak happened to run (`git log --format=%H,%P failed: ...` is an implementation detail, not something a user can act on).
+
 ### Changed
 - `.plan/` (internal PRD/spec/plan/roadmap docs) is no longer tracked in git — kept locally, `.gitignore`d going forward.
+- `scanner.py`'s six internal-only helpers (`compute_fingerprint`, `safe_preview`, `disabled_rule_ids`, `apply_allow_paths`, `apply_severity_overrides`, `apply_config_filters`) are now underscore-prefixed. The module previously exposed 14 public-looking functions when only `scan` is public API.
+- The package version now has a single source of truth: `pyproject.toml` reads it dynamically from `oneleak/__init__.py`, so `oneleak --version` and the packaged metadata cannot drift.
 - `Makefile` consolidated from 17 targets to 13: `lint` now absorbs the old `format-check`+`typecheck`, `test` always runs with coverage (absorbing `test-cov`), `install` also installs the pre-commit hook (absorbing `precommit-install`); removed the rarely-used `all` target. `.github/workflows/ci.yml` now calls `make lint`/`make test`/`make docs-build` instead of duplicating the underlying commands.
 - Docs nav grouped into Getting Started / Guides / Advanced / Reference sections instead of one flat list.
 

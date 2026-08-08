@@ -49,3 +49,12 @@ severity_overrides:
 ## Path-scoping in custom rules
 
 There is no per-rule `include_paths`/`exclude_paths` — path scoping is config-level only, via the top-level `exclude` / `allow.paths` fields above.
+
+## Adopting oneleak on an existing codebase
+
+Baseline files (snapshot today's findings, then fail only on *new* ones) are **not implemented yet**. Until they are, the practical ways to introduce oneleak to a repo that already has findings are:
+
+- `--fail-on high` — let low/medium findings report without breaking the build, and tighten the threshold over time.
+- `allow.paths` — exempt directories of known-intentional content (test fixtures, docs with example keys).
+- `disabled_rules` / `severity_overrides` — silence or downgrade a specific noisy rule rather than a whole path.
+- `# oneleak: allow <rule-id>` — a targeted, reviewable, line-level exemption. See [Custom Rules](rules.md#inline-suppression).

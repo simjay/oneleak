@@ -33,8 +33,43 @@ def _run_git(args: list[str], cwd: str | None = None) -> str:
     except FileNotFoundError as exc:
         raise ScanError("git executable not found") from exc
     except subprocess.CalledProcessError as exc:
-        raise ScanError(f"git {' '.join(args)} failed: {exc.stderr.strip()}") from exc
+        raise ScanError(_git_failure_message(exc.stderr)) from exc
     return result.stdout
+
+
+def _git_failure_message(stderr: str) -> str:
+    """Turn git's stderr into a message for the user, without echoing back the
+    internal command oneleak happened to run (`git log --format=%H,%P ...` is
+    an implementation detail; "not a git repository" is the actual problem).
+
+    Truncated: some git failures (e.g. an unrecognized option) respond with
+    git's full usage text, which is thousands of characters of noise in a CLI
+    error line.
+    """
+    detail = " ".join(stderr.split()).removeprefix("fatal: ")
+    if "not a git repository" in detail:
+        return "not a git repository"
+    if len(detail) > 200:
+        detail = detail[:200] + "..."
+    return f"git command failed: {detail}" if detail else "git command failed"
+
+
+def _require_git_repo(cwd: str | None) -> None:
+    """Fail fast with a clear message when we're not in a git repository.
+
+    Without this, the underlying commands fail in confusing ways -- outside a
+    repo `git diff --cached` falls back to `--no-index` mode, where `--cached`
+    is not a valid option, so git answers with its entire usage text rather
+    than "not a git repository".
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"], cwd=cwd, capture_output=True, check=False
+        )
+    except FileNotFoundError as exc:
+        raise ScanError("git executable not found") from exc
+    if result.returncode != 0:
+        raise ScanError("not a git repository")
 
 
 def _has_head(cwd: str | None = None) -> bool:
@@ -123,6 +158,7 @@ def scan_changed(*, cwd: str | None = None, rules=None, config=None) -> ScanResu
     """Scans the current working-tree content of files that differ from HEAD,
     plus untracked files. Whole-file scanning, not hunk-limited (see plan.md).
     """
+    _require_git_repo(cwd)
     return _scan_files(
         _changed_files(cwd), _read_working_tree_file, cwd=cwd, rules=rules, config=config
     )
@@ -132,6 +168,7 @@ def scan_staged(*, cwd: str | None = None, rules=None, config=None) -> ScanResul
     """Scans the staged (index) version of files, not the working-tree version --
     these can differ if a file was edited again after `git add`.
     """
+    _require_git_repo(cwd)
     return _scan_files(_staged_files(cwd), _read_staged_blob, cwd=cwd, rules=rules, config=config)
 
 
@@ -239,6 +276,7 @@ def scan_history(
     `git log --since=`. `Finding.commit` records which commit introduced it;
     `ScanResult.truncated` is True if `max_commits` cut the scan short.
     """
+    _require_git_repo(cwd)
     cfg = resolve_config(config)
     registry = build_registry(rules, cfg)
 

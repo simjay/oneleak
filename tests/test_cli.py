@@ -169,3 +169,122 @@ class TestErrorHandling:
         out = capsys.readouterr()
         assert code == 2
         assert "error:" in out.err
+
+
+# Python exception class names that must never reach a user-facing error line.
+# Asserting only `code == 2` and `"error:" in err` would pass both before and
+# after the fix that introduced these tests, pinning nothing -- so every case
+# below also asserts the message names the offending file and leaks no type.
+_LEAKY_TYPE_NAMES = [
+    "FileNotFoundError",
+    "JSONDecodeError",
+    "ParserError",
+    "ScannerError",
+    "KeyError",
+    "TypeError",
+    "OSError",
+    "Traceback",
+]
+
+
+def _assert_clean_error(err: str, *, names: str) -> None:
+    assert err.startswith("error: "), err
+    for leaked in _LEAKY_TYPE_NAMES:
+        assert leaked not in err, f"raw exception type {leaked!r} leaked to user: {err!r}"
+    assert names in err, f"error should name the offending file/subject: {err!r}"
+
+
+class TestErrorMessagesAreUserFacing:
+    def test_missing_config_file(self, tmp_path: Path, capsys):
+        target = tmp_path / "in.txt"
+        target.write_text("x")
+        missing = tmp_path / "nope.yaml"
+        code = main(["scan", str(target), "--config", str(missing)])
+        assert code == 2
+        _assert_clean_error(capsys.readouterr().err, names=str(missing))
+
+    def test_malformed_config_file(self, tmp_path: Path, capsys):
+        target = tmp_path / "in.txt"
+        target.write_text("x")
+        cfg = tmp_path / "bad.yaml"
+        cfg.write_text("exclude: [unclosed\n")
+        code = main(["scan", str(target), "--config", str(cfg)])
+        assert code == 2
+        err = capsys.readouterr().err
+        _assert_clean_error(err, names=str(cfg))
+        assert "invalid YAML" in err
+
+    def test_malformed_mapping_file(self, tmp_path: Path, capsys):
+        target = tmp_path / "in.txt"
+        target.write_text("x")
+        bad_map = tmp_path / "bad.json"
+        bad_map.write_text("not json at all")
+        code = main(["desanitize", str(target), "--map", str(bad_map)])
+        assert code == 2
+        _assert_clean_error(capsys.readouterr().err, names=str(bad_map))
+
+    def test_mapping_entry_missing_required_key(self, tmp_path: Path, capsys):
+        target = tmp_path / "in.txt"
+        target.write_text("x")
+        bad_map = tmp_path / "bad.json"
+        bad_map.write_text('{"mapping": {"<EMAIL_1>": {"value": "a@b.c"}}}')
+        code = main(["desanitize", str(target), "--map", str(bad_map)])
+        assert code == 2
+        err = capsys.readouterr().err
+        _assert_clean_error(err, names="<EMAIL_1>")
+
+    def test_git_scans_outside_a_repository(self, tmp_path: Path, capsys, monkeypatch):
+        # All three git modes must fail identically and cleanly. --staged used
+        # to dump git's entire usage text here: outside a repo `git diff
+        # --cached` falls back to --no-index mode, where --cached is invalid.
+        monkeypatch.chdir(tmp_path)
+        for flag in ("--changed", "--staged", "--history"):
+            code = main(["scan", flag])
+            err = capsys.readouterr().err
+            assert code == 2, flag
+            assert err.strip() == "error: not a git repository", f"{flag}: {err!r}"
+
+
+class TestErrorMessagesFromPythonAPI:
+    """The CLI is not the only caller -- `load_config` is reached from the
+    library too, so these must be fixed at the source, not in cli.main().
+    """
+
+    def test_missing_config_raises_config_error(self, tmp_path: Path):
+        import oneleak
+
+        with pytest.raises(oneleak.ConfigError) as exc_info:
+            oneleak.scan("x", config=str(tmp_path / "nope.yaml"))
+        assert "not found" in str(exc_info.value)
+
+    def test_missing_rule_file_raises_config_error(self, tmp_path: Path):
+        import oneleak
+
+        with pytest.raises(oneleak.ConfigError) as exc_info:
+            oneleak.scan("x", rules=[str(tmp_path / "nope.yaml")])
+        assert "not found" in str(exc_info.value)
+
+    def test_malformed_rule_file_raises_config_error(self, tmp_path: Path):
+        import oneleak
+
+        bad = tmp_path / "bad.yaml"
+        bad.write_text("rules: [unclosed\n")
+        with pytest.raises(oneleak.ConfigError) as exc_info:
+            oneleak.scan("x", rules=[str(bad)])
+        assert "invalid YAML" in str(exc_info.value)
+
+
+class TestVersionFlag:
+    def test_version_matches_package_metadata(self, capsys):
+        from importlib.metadata import version
+
+        import oneleak
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--version"])
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert oneleak.__version__ in out
+        # pyproject declares the version dynamically from oneleak/__init__.py;
+        # this pins that the two can never drift apart.
+        assert version("oneleak") == oneleak.__version__
