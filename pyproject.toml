@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "oneleak"
 # Single source of truth is oneleak/__init__.py's __version__, read by hatch
-# below -- so `oneleak --version` and the packaged version can never drift.
+# below, so `oneleak --version` and the packaged version can never drift.
 dynamic = ["version"]
 description = "A lightweight, pure-Python sensitive-data scanner and sanitizer for developer and agent workflows."
 readme = "README.md"
@@ -38,6 +38,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/simjay/oneleak"
+Documentation = "https://oneleak.readthedocs.io/"
 Repository = "https://github.com/simjay/oneleak"
 Issues = "https://github.com/simjay/oneleak/issues"
 Changelog = "https://github.com/simjay/oneleak/blob/main/CHANGELOG.md"
@@ -85,7 +86,7 @@ target-version = "py311"
 [tool.ruff.lint]
 # Explicit rather than relying on whatever this ruff version's implicit
 # default happens to be (which can change between releases). Includes
-# isort-equivalent import sorting/grouping (I) -- no separate isort tool
+# isort-equivalent import sorting/grouping (I), no separate isort tool
 # needed.
 select = [
     "E",   # pycodestyle errors

@@ -1,15 +1,12 @@
 # oneleak's own config, used by the pre-commit dogfood hook and `oneleak scan .`
 #
-# .plan/ and docs/ intentionally contain illustrative example secrets/PII
-# (e.g. the SSN and connection-string examples in .plan/spec.md's own
-# documentation of what those detectors catch) -- these are known, permanent
-# non-findings, not something to chase per-commit. See PRD Section 15: agents
-# "should not repeatedly attempt to fix known test data or intentional
-# examples."
+# .plan/ (untracked local planning notes) and docs/ intentionally contain
+# illustrative example secrets/PII to document what the detectors catch.
+# These are known, permanent non-findings, not something to chase per-commit.
 
 exclude:
   - "site/**"   # mkdocs build output, gitignored, may exist locally
-  - "uv.lock"   # gitignored; package-hash URLs are noisy, non-secret entropy
+  - "uv.lock"   # gitignored, package-hash URLs are noisy, non-secret entropy
 
 allow:
   paths:

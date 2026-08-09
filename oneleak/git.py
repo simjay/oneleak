@@ -1,6 +1,6 @@
 """Git integration: scan_changed() (working tree) and scan_staged() (index content).
 
-Uses the installed `git` binary via subprocess; the Python package itself stays
+Uses the installed `git` binary via subprocess. The Python package itself stays
 pure Python (this is the one module that shells out).
 """
 
@@ -20,7 +20,7 @@ from oneleak.scanner import (
     scan_text_with_config,
 )
 
-# The well-known SHA1 of git's empty tree object -- used as the "parent" of a
+# The well-known SHA1 of git's empty tree object, used as the "parent" of a
 # root commit (which has no real parent to diff against).
 _EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
@@ -40,7 +40,7 @@ def _run_git(args: list[str], cwd: str | None = None) -> str:
 def _git_failure_message(stderr: str) -> str:
     """Turn git's stderr into a message for the user, without echoing back the
     internal command oneleak happened to run (`git log --format=%H,%P ...` is
-    an implementation detail; "not a git repository" is the actual problem).
+    an implementation detail, and "not a git repository" is the actual problem).
 
     Truncated: some git failures (e.g. an unrecognized option) respond with
     git's full usage text, which is thousands of characters of noise in a CLI
@@ -57,7 +57,7 @@ def _git_failure_message(stderr: str) -> str:
 def _require_git_repo(cwd: str | None) -> None:
     """Fail fast with a clear message when we're not in a git repository.
 
-    Without this, the underlying commands fail in confusing ways -- outside a
+    Without this, the underlying commands fail in confusing ways: outside a
     repo `git diff --cached` falls back to `--no-index` mode, where `--cached`
     is not a valid option, so git answers with its entire usage text rather
     than "not a git repository".
@@ -156,7 +156,7 @@ def _scan_files(
 
 def scan_changed(*, cwd: str | None = None, rules=None, config=None) -> ScanResult:
     """Scans the current working-tree content of files that differ from HEAD,
-    plus untracked files. Whole-file scanning, not hunk-limited (see plan.md).
+    plus untracked files. Whole-file scanning, not hunk-limited.
     """
     _require_git_repo(cwd)
     return _scan_files(
@@ -165,8 +165,8 @@ def scan_changed(*, cwd: str | None = None, rules=None, config=None) -> ScanResu
 
 
 def scan_staged(*, cwd: str | None = None, rules=None, config=None) -> ScanResult:
-    """Scans the staged (index) version of files, not the working-tree version --
-    these can differ if a file was edited again after `git add`.
+    """Scans the staged (index) version of files, not the working-tree version.
+    These can differ if a file was edited again after `git add`.
     """
     _require_git_repo(cwd)
     return _scan_files(_staged_files(cwd), _read_staged_blob, cwd=cwd, rules=rules, config=config)
@@ -202,7 +202,7 @@ def _commit_list(
 
     truncated = bool(max_commits) and len(lines) > max_commits
     if max_commits:
-        lines = lines[:max_commits]  # git log is newest-first; keep the newest N
+        lines = lines[:max_commits]  # git log is newest-first, keep the newest N
     lines.reverse()  # then process oldest-first, so `commit` means "introduced in"
 
     commits = []
@@ -216,10 +216,10 @@ def _commit_list(
 def _commit_diff_hunks(sha: str, parent: str, cwd: str | None) -> list[_CommitHunk]:
     """Parses `git diff --unified=0` output into one blob per hunk, made of
     only the *added* lines (joined with newlines, so multi-line formats like
-    a PEM private key stay adjacent for the detection pipeline to match --
+    a PEM private key stay adjacent for the detection pipeline to match:
     scanning line-by-line would split BEGIN/END markers into disconnected
-    strings the PEM regex could never join). Only additions are collected;
-    removed lines are ignored. Renamed/deleted files and binary diffs
+    strings the PEM regex could never join). Only additions are collected.
+    Removed lines are ignored. Renamed/deleted files and binary diffs
     contribute nothing (a deletion-only hunk has no `+` lines to collect).
     """
     diff_text = _run_git(["diff", "--unified=0", "--no-color", parent, sha], cwd=cwd)
@@ -268,13 +268,13 @@ def scan_history(
     all_refs: bool = False,
 ) -> ScanResult:
     """Scans commit history for secrets, including ones later removed from
-    the working tree -- what `oneleak scan .` / scan_changed() / scan_staged()
+    the working tree: what `oneleak scan .` / scan_changed() / scan_staged()
     cannot see, since they only look at current content.
 
     Defaults to the current branch's history (not --all), capped at the most
-    recent 5000 commits; both are overridable. `since` is passed straight to
-    `git log --since=`. `Finding.commit` records which commit introduced it;
-    `ScanResult.truncated` is True if `max_commits` cut the scan short.
+    recent 5000 commits. Both are overridable. `since` is passed straight to
+    `git log --since=`. `Finding.commit` records which commit introduced it,
+    and `ScanResult.truncated` is True if `max_commits` cut the scan short.
     """
     _require_git_repo(cwd)
     cfg = resolve_config(config)

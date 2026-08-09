@@ -67,7 +67,7 @@ class TestProviderRules:
     def test_slack_webhook_url(self):
         # Assembled from parts on purpose. Written as one contiguous literal,
         # this fixture trips GitHub's push protection, which blocks the push
-        # even though the value is obviously fake -- their webhook detector is
+        # even though the value is obviously fake. Their webhook detector is
         # purely structural, so there is no "clearly a test value" it accepts.
         # A secret scanner's own fixtures have to dodge other secret scanners.
         # Do not "simplify" this back into a single string.
@@ -94,7 +94,7 @@ class TestProviderRules:
 
     def test_datadog_api_key_negative_without_keyword_context(self):
         # Bare 32-char hex string with no "datadog"/"dd_api_key" nearby
-        # should not fire -- this rule requires keyword context precisely
+        # should not fire. This rule requires keyword context precisely
         # because a bare 32-hex-char pattern is indistinguishable from an
         # MD5 hash otherwise.
         result = oneleak.scan("checksum = " + "a" * 32)
@@ -119,7 +119,7 @@ class TestProviderRules:
     def test_azure_storage_key(self):
         # Regression test: the original pattern's trailing \b could never be
         # satisfied after `==` padding (a non-word char), so this rule was
-        # completely dead -- confirm it actually fires now.
+        # completely dead. Confirm it actually fires now.
         result = oneleak.scan("AccountKey=" + "a" * 86 + "==;EndpointSuffix=core.windows.net")
         assert "azure-storage-key" in rule_ids(result)
 
@@ -135,7 +135,7 @@ class TestProviderRules:
 
     def test_openai_key_bounded_not_defeated_by_trailing_junk(self):
         # Regression test: a naive fix (bound the quantifier but keep a
-        # trailing \b) makes this WORSE than the original bug -- it goes
+        # trailing \b) makes this WORSE than the original bug: it goes
         # from "over-matches" to "matches nothing at all", since a bounded
         # quantifier can never backtrack to a valid \b position when the
         # word-character run continues past the cap. Must still detect the
@@ -172,7 +172,7 @@ class TestConnectionString:
 
 class TestOverlapResolution:
     def test_provider_pattern_wins_over_entropy(self):
-        # A real OpenAI-shaped key is also high-entropy; only one finding
+        # A real OpenAI-shaped key is also high-entropy. Only one finding
         # (the provider-specific one) should survive for that span.
         text = "sk-proj-abcdEFGH1234ijklMNOP5678"
         result = oneleak.scan(text)
@@ -203,7 +203,7 @@ class TestInlineSuppression:
         # aws-access-key-id (priority 100) wins the overlap against
         # generic-secret (priority 50) for this span. Scoping the allow
         # comment to aws-access-key-id specifically must not silently drop
-        # the whole span -- generic-secret should still fire in its place.
+        # the whole span. generic-secret should still fire in its place.
         text = 'api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleak: allow aws-access-key-id\n'
         result = oneleak.scan(text)
         assert rule_ids(result) == ["generic-secret"]
@@ -213,7 +213,7 @@ class TestBytesInput:
     def test_non_utf8_bytes_skipped_not_raised(self):
         # Regression test: scan(bytes) used to unconditionally raise on
         # undecodable input, unlike an equivalent binary file on disk (which
-        # is silently skipped) -- the two input forms must behave the same.
+        # is silently skipped). The two input forms must behave the same.
         result = oneleak.scan(b"\xff\xfe not utf8 \x00\x00\x00")
         assert result.safe
 

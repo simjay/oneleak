@@ -17,7 +17,7 @@ class TestEntropy:
         assert entropy_candidates(text) == []
 
     def test_pure_hex_hash_not_flagged(self):
-        # sha1-length hex hash -- classic false-positive trap, excluded in v0.1
+        # sha1-length hex hash: classic false-positive trap, excluded in v0.1
         text = "commit da39a3ee5e6b4b0d3255bfef95601890afd80709abc123"
         assert entropy_candidates(text) == []
 
@@ -63,10 +63,10 @@ class TestGenericAssignment:
     def test_github_actions_permission_scope_not_flagged(self):
         # Regression test: "id-token: write" (a GitHub Actions OIDC permission
         # scope, not a credential) was a real false positive found via
-        # dogfooding -- "write"/"read" are permission values, not secrets.
+        # dogfooding: "write"/"read" are permission values, not secrets.
         # "id-token" does match the bare "token" keyword (the hyphen is a
         # non-word char, so \btoken\b has a boundary there, unlike "API_TOKEN"
-        # where the underscore keeps it one word) -- it's the value, not the
+        # where the underscore keeps it one word). It's the value, not the
         # keyword match, that must be excluded.
         assert generic_assignment_candidates("permissions:\n  id-token: write\n") == []
         assert generic_assignment_candidates("secret: read\n") == []

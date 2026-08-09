@@ -9,12 +9,21 @@ from re import Pattern
 
 
 class Category(StrEnum):
+    """`Finding`/`Rule` category. `SENSITIVE` is for custom rules that are
+    neither a secret nor PII (an internal ID format, a proprietary token).
+    """
+
     SECRET = "secret"
     PII = "pii"
     SENSITIVE = "sensitive"
 
 
 class Severity(StrEnum):
+    """`Finding`/`Rule` severity, ordered low to critical. Used both as the
+    finding's own severity and as the allowed values for `--fail-on` /
+    `severity_overrides`.
+    """
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -60,7 +69,7 @@ class Finding:
 class ScanResult:
     findings: list[Finding] = field(default_factory=list)
 
-    # Set by git.scan_history() when a commit/time cap cut the scan short --
+    # Set by git.scan_history() when a commit/time cap cut the scan short,
     # surfaced so truncation is never silent (see CONTRIBUTING.md / the "no
     # silent caps" principle).
     truncated: bool = False
@@ -122,7 +131,7 @@ class PythonRule:
 
     Subclasses must set id/category/type/severity as class attributes and
     implement detect(). Python rules are never auto-loaded from repository
-    config — callers must pass instances explicitly to scan(rules=[...]).
+    config. Callers must pass instances explicitly to scan(rules=[...]).
     """
 
     id: str

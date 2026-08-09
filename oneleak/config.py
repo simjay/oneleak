@@ -26,6 +26,11 @@ _KNOWN_SEVERITIES = {s.value for s in Severity}
 
 @dataclass
 class Config:
+    """Parsed `.oneleak.yaml`, or construct one directly to pass to
+    `scan(config=...)` without a YAML file. `allow_paths` here corresponds to
+    the YAML's nested `allow: {paths: [...]}`, flattened for convenience.
+    """
+
     version: int = 1
     exclude: list[str] = field(default_factory=list)
     pii: dict[str, bool] = field(default_factory=dict)
@@ -92,8 +97,8 @@ DEFAULT_CONFIG_FILENAME = ".oneleak.yaml"
 
 
 def discover_config(start: Path | None = None) -> Config | None:
-    """Look for `.oneleak.yaml` in `start` (default: cwd). Used by the CLI only --
-    the Python API never auto-loads config, to keep library calls side-effect-free.
+    """Look for `.oneleak.yaml` in `start` (default: cwd). Used by the CLI only.
+    The Python API never auto-loads config, to keep library calls side-effect-free.
     """
     base = start or Path.cwd()
     candidate = base / DEFAULT_CONFIG_FILENAME

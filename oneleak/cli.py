@@ -9,6 +9,12 @@ import sys
 from pathlib import Path
 
 from oneleak import __version__, git
+from oneleak.baseline import (
+    filter_new,
+    load_baseline,
+    require_stable_fingerprint_key,
+    write_baseline,
+)
 from oneleak.config import discover_config
 from oneleak.errors import ConfigError, OneleakError, read_text_file
 from oneleak.models import Finding, MappingEntry, Severity, severity_rank
@@ -54,6 +60,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
         )
         return EXIT_ERROR
 
+    if args.update_baseline and not args.baseline:
+        print("error: --update-baseline requires --baseline", file=sys.stderr)
+        return EXIT_ERROR
+
     config = args.config or discover_config()
 
     findings: list[Finding] = []
@@ -79,6 +89,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
                 findings.extend(scan(text, config=config).findings)
             else:
                 findings.extend(scan(Path(target), config=config).findings)
+
+    if args.baseline:
+        require_stable_fingerprint_key()
+        if args.update_baseline:
+            write_baseline(args.baseline, findings)
+        findings = filter_new(findings, load_baseline(args.baseline))
 
     if truncated:
         print(
@@ -212,6 +228,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only findings at or above this severity affect the exit code",
     )
     scan_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")
+    scan_p.add_argument(
+        "--baseline",
+        default=None,
+        help="Path to a baseline file; only findings not already in it are reported",
+    )
+    scan_p.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="With --baseline: overwrite it with this run's findings",
+    )
     scan_p.set_defaults(func=cmd_scan)
 
     sanitize_p = subparsers.add_parser(

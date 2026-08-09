@@ -64,6 +64,7 @@ nav:
       - MCP Server: mcp.md
   - Advanced:
       - How Scanning & Sanitization Work: architecture.md
+      - Concepts: concepts.md
   - Reference:
       - API Reference: api.md
       - Changelog: changelog.md

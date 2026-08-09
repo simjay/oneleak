@@ -22,7 +22,7 @@ repos:
 
       - id: oneleak-scan-staged
         name: oneleak scan --staged
-        description: Dogfooding -- oneleak scanning its own staged changes before commit
+        description: Dogfooding, oneleak scanning its own staged changes before commit
         entry: uv run oneleak scan --staged --fail-on high
         language: system
         pass_filenames: false

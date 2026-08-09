@@ -28,7 +28,7 @@ result.risk      # "critical"
 result.findings  # list[Finding]
 ```
 
-Each `Finding` never carries the raw sensitive value — only a masked `preview` (`sk-p****789`) and an HMAC-based `fingerprint` you can use to recognize repeats.
+Each `Finding` never carries the raw sensitive value, only a masked `preview` (`sk-p****789`) and an HMAC-based `fingerprint` you can use to recognize repeats.
 
 ## Scan files and directories
 
@@ -41,7 +41,7 @@ oneleak.scan(Path("."))
 
 !!! warning "A `str` is always content, never a path"
 
-    `oneleak.scan("config.yaml")` scans the eleven characters `config.yaml` — it does **not** open that file. Wrap filesystem input in `Path(...)`, as above. This is deliberate: guessing whether a string is a path or a payload would silently read files when you meant to scan text.
+    `oneleak.scan("config.yaml")` scans the eleven characters `config.yaml`. It does **not** open that file. Wrap filesystem input in `Path(...)`, as above. This is deliberate: guessing whether a string is a path or a payload would silently read files when you meant to scan text.
 
 Binary files and files over 10 MB are skipped automatically. `.git/`, `node_modules/`, `.venv/`, `venv/`, `__pycache__/`, `dist/`, and `build/` are excluded by default.
 
@@ -60,7 +60,7 @@ Repeated values reuse the same placeholder within one call. See [Sanitization](s
 ```python
 oneleak.git.scan_changed()  # working-tree changes + untracked files
 oneleak.git.scan_staged()   # staged (index) content, not the working-tree version
-oneleak.git.scan_history()  # commit history -- finds secrets later removed from the tree
+oneleak.git.scan_history()  # commit history: finds secrets later removed from the tree
 ```
 
 This is the core "did the agent just leak something" loop: scan after every edit, act on findings before continuing.
@@ -69,6 +69,8 @@ This is the core "did the agent just leak something" loop: scan after every edit
 
 - [CLI Reference](cli.md) for `oneleak scan` / `sanitize` / `desanitize`
 - [Configuration](configuration.md) for `.oneleak.yaml`
+- [Baselines](configuration.md#baselines) to adopt oneleak on a repo that already has findings, without a blocking flag-day
 - [Custom Rules](rules.md) to extend detection without forking the library
 - [MCP Server](mcp.md) to expose scan/sanitize as tools for an agent runtime
 - [How Scanning & Sanitization Work](architecture.md) for the detection pipeline in detail
+- [Concepts](concepts.md) for the field knowledge behind the design (entropy, validators, fingerprinting, and why some competitor techniques weren't adopted)

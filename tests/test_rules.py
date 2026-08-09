@@ -47,7 +47,7 @@ class TestYAMLRules:
     def test_null_keywords_does_not_crash(self, tmp_path: Path):
         # Regression test: `keywords:` with no value parses as None in YAML.
         # This used to crash with a raw, unhandled TypeError (tuple(None) is
-        # not iterable) instead of loading cleanly with no keywords -- same
+        # not iterable) instead of loading cleanly with no keywords, same
         # as if the field had been omitted entirely.
         rule_file = tmp_path / "null-keywords.yaml"
         rule_file.write_text(
@@ -110,7 +110,7 @@ class TestPythonRules:
 
     def test_python_rule_with_nonstandard_category(self):
         # PythonRule.category is a free-form string, not validated against
-        # Category (unlike declarative rules) -- confirms the fingerprint
+        # Category (unlike declarative rules). Confirms the fingerprint
         # prefix fallback for an unrecognized category actually gets hit.
         class SimpleRule(PythonRule):
             id = "simple-rule"

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Prints rough timing numbers for the scenarios in .plan/v1-roadmap.md's
-"Performance benchmarks" item: 1KB/1MB text, a config-file-sized input, a
-small/large synthetic repo, and git.scan_changed().
+"""Prints rough timing numbers for a handful of representative scenarios:
+1KB/1MB text, a config-file-sized input, a small/large synthetic repo, and
+git.scan_changed().
 
 Not a pass/fail gate (perf varies too much across machines/CI runners to
-hard-assert on) -- just run `make bench` and eyeball the numbers, or diff
+hard-assert on). Just run `make bench` and eyeball the numbers, or diff
 two runs before/after a detector change.
 """
 

@@ -13,7 +13,7 @@ uv run pre-commit install
 make format   # ruff format + ruff check --fix (mutating)
 make lint     # ruff check + ruff format --check + mypy (verify only)
 make test     # pytest, with coverage
-make ci       # lint + test + docs-build -- what CI runs
+make ci       # lint + test + docs-build (what CI runs)
 ```
 
 `make ci` must pass before opening a PR. `pre-commit` runs a subset of the same checks automatically on `git commit`, including `oneleak scan --staged` on the repo's own changes.
@@ -30,7 +30,7 @@ Every new rule needs:
 
 Add tests to `tests/test_scanner.py` (or a focused new test file for a large batch of rules).
 
-**Never use real credentials in test fixtures** — even expired or revoked ones. Use clearly-fake values (`"a" * 20`, `sk-proj-` + filler, etc.), matching the existing test style.
+**Never use real credentials in test fixtures**, even expired or revoked ones. Use clearly-fake values (`"a" * 20`, `sk-proj-` + filler, etc.), matching the existing test style.
 
 ## Priority tiers for overlap resolution
 
@@ -48,8 +48,8 @@ If your new rule is provider-specific (a fixed, identifiable prefix like `AKIA..
 
 ## Reporting a false positive / false negative
 
-Add a regression test reproducing it (see "Adding a built-in rule" above) — false-positive regressions become permanent test cases, not just bug reports.
+Add a regression test reproducing it (see "Adding a built-in rule" above). False-positive regressions become permanent test cases, not just bug reports.
 
 ## Security issues
 
-Do not open a public issue for a security vulnerability — see [SECURITY.md](SECURITY.md).
+Do not open a public issue for a security vulnerability. See [SECURITY.md](SECURITY.md).

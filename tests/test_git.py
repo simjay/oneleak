@@ -23,7 +23,7 @@ class TestScanStaged:
         secret_file = repo / "secret.env"
         secret_file.write_text("OPENAI_API_KEY=sk-proj-" + "a" * 20 + "\n")
         subprocess.run(["git", "add", "secret.env"], cwd=repo, check=True)
-        # Edit again after staging -- staged scan must see the pre-edit version.
+        # Edit again after staging: staged scan must see the pre-edit version.
         secret_file.write_text(
             "OPENAI_API_KEY=sk-proj-" + "a" * 20 + "\nANTHROPIC_KEY=sk-ant-" + "b" * 20 + "\n"
         )
@@ -39,8 +39,8 @@ class TestScanStaged:
 
     def test_respects_config_allow_paths(self, repo):
         # Regression test: scan_staged()/scan_changed() must apply config
-        # filtering (allow.paths, disabled_rules) exactly like scan() does --
-        # they previously called scan_text() directly and skipped it.
+        # filtering (allow.paths, disabled_rules) exactly like scan() does.
+        # They previously called scan_text() directly and skipped it.
         fixtures = repo / "tests" / "fixtures"
         fixtures.mkdir(parents=True)
         (fixtures / "example.env").write_text("OPENAI_API_KEY=sk-proj-" + "a" * 20 + "\n")
@@ -92,7 +92,7 @@ class TestScanHistory:
         )
         _commit_file(repo, "app.py", "x = 1\n# removed the secret\n", "c3 - fix")
 
-        # Current content no longer has it -- scan_changed()/scan() would miss it.
+        # Current content no longer has it, scan_changed()/scan() would miss it.
         current = git.scan_changed(cwd=str(repo))
         assert current.safe
 

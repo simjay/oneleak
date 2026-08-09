@@ -1,10 +1,10 @@
 """Exception hierarchy, plus helpers for turning low-level failures into clean
 oneleak errors.
 
-Error messages must never dump raw sensitive content -- and, just as
+Error messages must never dump raw sensitive content, and, just as
 importantly for anyone running oneleak in CI, they must never surface a raw
 Python exception type. `cli.py::main()` renders any `OneleakError` as a plain
-`error: <message>`; anything else falls through to a generic handler that
+`error: <message>`. Anything else falls through to a generic handler that
 prints the exception class name. So raising the right type here *is* the
 user-facing error-message fix.
 """
@@ -17,7 +17,9 @@ import yaml
 
 
 class OneleakError(Exception):
-    pass
+    """Base class for every error oneleak raises deliberately. Catch this to
+    handle any oneleak failure without needing to know which subclass it is.
+    """
 
 
 class ConfigError(OneleakError):
@@ -46,7 +48,7 @@ def read_text_file(path: str | Path, *, what: str) -> str:
 def yaml_error_detail(exc: yaml.YAMLError) -> str:
     """Condense a PyYAML error into one line.
 
-    Raw `str(a YAMLError)` is a multi-line dump with a caret diagram; that is
+    Raw `str(a YAMLError)` is a multi-line dump with a caret diagram, which is
     fine in a traceback and terrible in a CLI error line.
     """
     problem = getattr(exc, "problem", None)

@@ -1,8 +1,8 @@
 # oneleak
 
-oneleak is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs -- agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required (the one exception: `git` itself, used only by `oneleak.git`).
+oneleak is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs: agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required (the one exception: `git` itself, used only by `oneleak.git`).
 
-Full docs: **[oneleak.readthedocs.io](https://oneleak.readthedocs.io/)** — [architecture](https://oneleak.readthedocs.io/architecture/) explains the detection pipeline and sanitization algorithm in detail.
+Full docs: **[oneleak.readthedocs.io](https://oneleak.readthedocs.io/)**. The [architecture](https://oneleak.readthedocs.io/architecture/) page explains the detection pipeline and sanitization algorithm in detail.
 
 ## Install
 
@@ -43,14 +43,14 @@ result = oneleak.sanitize(text, reveal=True)
 restored = oneleak.desanitize(result.text, result.mapping)  # restored == text
 ```
 
-`result.mapping` is only populated with `reveal=True` -- never by default.
+`result.mapping` is only populated with `reveal=True`, never by default.
 
 ### Git, including history
 
 ```python
 oneleak.git.scan_changed()   # working-tree changes + untracked files
 oneleak.git.scan_staged()    # staged (index) content
-oneleak.git.scan_history()   # commit history -- finds secrets later removed from the tree
+oneleak.git.scan_history()   # commit history: finds secrets later removed from the tree
 ```
 
 ### Custom rules
@@ -69,6 +69,10 @@ oneleak scan --staged
 oneleak scan --history
 oneleak scan . --json
 oneleak scan . --fail-on high
+
+# adopting oneleak on a repo that already has findings: baseline them, fail only on new ones
+oneleak scan . --baseline .oneleak-baseline.json --update-baseline
+oneleak scan . --baseline .oneleak-baseline.json
 
 some-command | oneleak sanitize -
 oneleak sanitize file.txt --map mapping.json   # writes a reversible mapping (0600, never default)
@@ -108,7 +112,7 @@ uv sync --all-extras
 make format   # ruff format + ruff check --fix
 make lint     # ruff check + ruff format --check + mypy
 make test     # pytest with coverage
-make ci       # lint + test + docs-build -- what GitHub Actions runs
+make ci       # lint + test + docs-build (what GitHub Actions runs)
 ```
 
 See [AGENTS.md](AGENTS.md) for a repo orientation aimed at coding agents, [CONTRIBUTING.md](CONTRIBUTING.md) for the human contribution guide, and [docs/](https://oneleak.readthedocs.io/) for full documentation.

@@ -1,7 +1,7 @@
-"""Tests the MCP tool functions directly (not over a real stdio transport --
-the protocol framing is the `mcp` SDK's responsibility, not oneleak's; what
+"""Tests the MCP tool functions directly (not over a real stdio transport,
+the protocol framing is the `mcp` SDK's responsibility, not oneleak's). What
 needs testing here is that each tool produces correct, JSON-serializable
-output matching the CLI's shapes).
+output matching the CLI's shapes.
 """
 
 import pytest

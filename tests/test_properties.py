@@ -175,7 +175,7 @@ def test_resolve_overlaps_is_non_overlapping_and_never_loses_to_a_weaker_candida
     assert result_set <= {id(c) for c in candidates}
 
     # 3. Every candidate that did NOT survive lost to a surviving candidate
-    #    that overlaps it and is at least as high priority -- overlap
+    #    that overlaps it and is at least as high priority. Overlap
     #    resolution should never let a weaker candidate win.
     for c in candidates:
         if id(c) in result_set:

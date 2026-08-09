@@ -14,5 +14,5 @@ uv.lock
 .oneleak-map.json
 *.oneleak-map.json
 
-# Internal planning docs -- not meant to be published in repo history
+# Internal planning docs, not meant to be published in repo history
 .plan/

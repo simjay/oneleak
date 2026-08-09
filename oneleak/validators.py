@@ -125,7 +125,7 @@ _SSN_RE_STRICT = None  # populated lazily to avoid import cost at module load
 def ssn(value: str) -> bool:
     """Structural SSN validation only. Deliberately does NOT use pre-2011
     state-based area-number tables, which the SSA's June 2011 randomization
-    made obsolete -- that older approach rejects valid modern SSNs.
+    made obsolete: that older approach rejects valid modern SSNs.
     """
     digits = value.replace("-", "").replace(" ", "")
     if len(digits) != 9 or not digits.isdigit():

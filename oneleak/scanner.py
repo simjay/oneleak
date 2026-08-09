@@ -365,7 +365,7 @@ def scan_path(
 
 def resolve_text_input(content, *, skip_unreadable: bool = False) -> tuple[str | None, str | None]:
     """Resolve str/bytes/single-file-Path input to (text, path). Directories
-    are not supported here -- use scan_path() directly for those.
+    are not supported here, use scan_path() directly for those.
 
     With skip_unreadable=True (used by scan(), to match directory-scan's
     "skip binary files safely" default), a binary/undecodable file yields
@@ -453,7 +453,7 @@ def _apply_severity_overrides(findings: list[Finding], cfg) -> list[Finding]:
 def _apply_config_filters(findings: list[Finding], cfg) -> list[Finding]:
     """The full set of post-scan, config-driven transforms: severity
     overrides, then allow-path filtering. Every entry point that produces
-    findings from a Config should route through this -- see _disabled_rule_ids()
+    findings from a Config should route through this. See _disabled_rule_ids()
     for why (this is the other half of the same consistency guarantee).
     """
     return _apply_allow_paths(_apply_severity_overrides(findings, cfg), cfg)

@@ -26,7 +26,7 @@ def _has_keyword_context(text: str, start: int, keywords: tuple[str, ...]) -> bo
 def regex_candidates(text: str, rule: Rule) -> list[RuleMatch]:
     """Run a compiled-regex rule over text. If the pattern has a named group
     'value', the finding span is that group's span (e.g. connection-string
-    credentials); otherwise the whole match is used.
+    credentials). Otherwise the whole match is used.
     """
     if rule.pattern is None:
         return []
@@ -152,10 +152,13 @@ def entropy_candidates(
     min_length: int = DEFAULT_MIN_LENGTH,
 ) -> list[RuleMatch]:
     """Only considers base64-alphabet candidates. Pure-hex runs (git hashes,
-    checksums) are deliberately excluded -- they're indistinguishable from
-    real secrets by entropy alone; see spec.md Section 9 and concepts.md
-    Section 3/4 for why a smarter (token-efficiency-style) scorer is a
-    tracked post-v0.1 improvement rather than a v0.1 requirement.
+    checksums) and canonical UUID shapes are excluded via dedicated checks
+    rather than relying on entropy to catch them, since entropy alone can't
+    distinguish structured-but-random-looking data from a real secret. See
+    docs/concepts.md for why a BPE-tokenizer-based scorer (as used by
+    Betterleaks) was evaluated and not adopted: measured on oneleak's own
+    candidate set it doesn't separate real secrets from the false-positive
+    classes those two checks don't already handle.
     """
     matches: list[RuleMatch] = []
     for m in _BASE64_CANDIDATE_RE.finditer(text):

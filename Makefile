@@ -40,10 +40,10 @@ docs-serve:
 docs-build:
 	uv run mkdocs build --strict
 
-# Secondary docs host (GitHub Pages) -- the one actually driven by GitHub
+# Secondary docs host (GitHub Pages), the one actually driven by GitHub
 # Actions (.github/workflows/docs.yml). The primary host is Read the Docs,
 # which builds automatically from its own webhook once the repo is connected
-# there (see .readthedocs.yaml); no CI step can trigger that directly.
+# there (see .readthedocs.yaml). No CI step can trigger that directly.
 docs-deploy:
 	uv run mkdocs gh-deploy --force
 

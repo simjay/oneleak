@@ -36,7 +36,7 @@ class TestSSN:
 
     def test_post_2011_high_area_number_is_valid(self):
         # Area numbers above the old (pre-2011) state-assignment tables are
-        # valid post-randomization; must NOT be rejected.
+        # valid post-randomization, and must NOT be rejected.
         assert validators.ssn("772-45-6789")
         assert validators.ssn("850-45-6789")
 

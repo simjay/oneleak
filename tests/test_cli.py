@@ -49,7 +49,7 @@ class TestScanCommand:
         assert code == 1
 
     def test_fail_on_threshold(self, monkeypatch, capsys):
-        # email is "low" severity; --fail-on high should not block on it.
+        # email is "low" severity, --fail-on high should not block on it.
         code, _out = run_cli(
             ["scan", "-", "--fail-on", "high"],
             stdin_text="contact alice@example.com\n",
@@ -132,7 +132,7 @@ class TestHistoryCommand:
     ):
         repo = self._repo_with_removed_secret(tmp_path)
         # cmd_scan doesn't pass an explicit cwd to git.scan_history(), so it
-        # falls back to the process's actual cwd -- same as running `oneleak
+        # falls back to the process's actual cwd, same as running `oneleak
         # scan --history` from within the repo on a real shell.
         monkeypatch.chdir(repo)
 
@@ -173,7 +173,7 @@ class TestErrorHandling:
 
 # Python exception class names that must never reach a user-facing error line.
 # Asserting only `code == 2` and `"error:" in err` would pass both before and
-# after the fix that introduced these tests, pinning nothing -- so every case
+# after the fix that introduced these tests, pinning nothing, so every case
 # below also asserts the message names the offending file and leaks no type.
 _LEAKY_TYPE_NAMES = [
     "FileNotFoundError",
@@ -246,7 +246,7 @@ class TestErrorMessagesAreUserFacing:
 
 
 class TestErrorMessagesFromPythonAPI:
-    """The CLI is not the only caller -- `load_config` is reached from the
+    """The CLI is not the only caller: `load_config` is reached from the
     library too, so these must be fixed at the source, not in cli.main().
     """
 
@@ -285,6 +285,91 @@ class TestVersionFlag:
         assert exc_info.value.code == 0
         out = capsys.readouterr().out
         assert oneleak.__version__ in out
-        # pyproject declares the version dynamically from oneleak/__init__.py;
-        # this pins that the two can never drift apart.
+        # pyproject declares the version dynamically from oneleak/__init__.py.
+        # This pins that the two can never drift apart.
         assert version("oneleak") == oneleak.__version__
+
+
+class TestBaselineFlag:
+    _SECRET_TEXT = "OPENAI_API_KEY=sk-proj-" + "a" * 20 + "\n"
+
+    def test_baseline_requires_stable_fingerprint_key(self, tmp_path: Path, monkeypatch, capsys):
+        monkeypatch.delenv("ONELEAK_FINGERPRINT_KEY", raising=False)
+        baseline = tmp_path / "baseline.json"
+        code, out = run_cli(
+            ["scan", "-", "--baseline", str(baseline)],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        assert code == 2
+        assert "ONELEAK_FINGERPRINT_KEY" in out.err
+
+    def test_update_baseline_without_baseline_flag_is_an_error(self, monkeypatch, capsys):
+        code, out = run_cli(
+            ["scan", "-", "--update-baseline"],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        assert code == 2
+        assert "--update-baseline requires --baseline" in out.err
+
+    def test_update_baseline_then_rescan_reports_no_new_findings(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        baseline = tmp_path / "baseline.json"
+
+        code, out = run_cli(
+            ["scan", "-", "--baseline", str(baseline), "--update-baseline"],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        assert code == 0
+        assert "No findings" in out.out
+        assert baseline.exists()
+
+        code, out = run_cli(
+            ["scan", "-", "--baseline", str(baseline)],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        assert code == 0
+        assert "No findings" in out.out
+
+    def test_new_finding_not_in_baseline_still_reported(self, tmp_path: Path, monkeypatch, capsys):
+        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        baseline = tmp_path / "baseline.json"
+        baseline.write_text('{"version": 1, "findings": []}', encoding="utf-8")
+
+        code, out = run_cli(
+            ["scan", "-", "--baseline", str(baseline)],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        assert code == 1
+        assert "openai-api-key" in out.out
+
+    def test_baseline_shrinks_when_secret_is_removed(self, tmp_path: Path, monkeypatch, capsys):
+        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        baseline = tmp_path / "baseline.json"
+
+        run_cli(
+            ["scan", "-", "--baseline", str(baseline), "--update-baseline"],
+            stdin_text=self._SECRET_TEXT,
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+        run_cli(
+            ["scan", "-", "--baseline", str(baseline), "--update-baseline"],
+            stdin_text="hello world\n",
+            monkeypatch=monkeypatch,
+            capsys=capsys,
+        )
+
+        data = json.loads(baseline.read_text(encoding="utf-8"))
+        assert data["findings"] == []

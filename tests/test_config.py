@@ -53,7 +53,7 @@ severity_overrides:
             parse_config("severity_overrides:\n  some-rule: extreme\n")
 
     def test_removed_sanitize_field_is_now_unknown(self):
-        # `sanitize:` was removed as unused config plumbing (see .plan/v1-roadmap.md).
+        # `sanitize:` was removed as unused config plumbing: parsed but never consumed.
         with pytest.raises(ConfigError):
             parse_config("sanitize:\n  mode: typed\n")
 

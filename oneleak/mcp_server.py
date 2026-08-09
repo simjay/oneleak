@@ -1,7 +1,7 @@
 """MCP server exposing scan/sanitize/desanitize as tools for agent runtimes.
 
 Run with `oneleak-mcp` (installed via `pip install oneleak[mcp]`), or
-`python -m oneleak.mcp_server`. Uses stdio transport -- the standard way
+`python -m oneleak.mcp_server`. Uses stdio transport, the standard way
 local MCP servers are launched by clients like Claude Code / Claude Desktop.
 
 Each tool auto-discovers `.oneleak.yaml` from the server process's working
@@ -57,8 +57,8 @@ def scan_path(path: str) -> dict:
 def sanitize_text(content: str, reveal: bool = False) -> dict:
     """Redact secrets/PII in text with typed, numbered placeholders
     (<EMAIL_1>, <OPENAI_API_KEY_1>, ...). If reveal=True, also returns a
-    mapping usable with desanitize_text to reverse it later -- treat that
-    mapping exactly as sensitively as the original content; it contains raw
+    mapping usable with desanitize_text to reverse it later. Treat that
+    mapping exactly as sensitively as the original content: it contains raw
     values.
     """
     result = _sanitize(content, config=discover_config(), reveal=reveal)
