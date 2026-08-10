@@ -13,6 +13,7 @@ import secrets
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from oneleak import pii_rules
 from oneleak.config import Config, load_config
 from oneleak.detectors import (
     entropy_candidates,
@@ -117,7 +118,7 @@ def _compute_fingerprint(
 
 
 def _safe_preview(type_: str, value: str) -> str:
-    if type_ == "private_key":
+    if type_ in ("private_key", "pgp_private_key"):
         return "<PRIVATE_KEY>"
     if type_ == "email" and "@" in value:
         local, _, domain = value.partition("@")
@@ -501,20 +502,10 @@ def scan(content, *, rules=None, config=None) -> ScanResult:
     return ScanResult(findings=findings)
 
 
-_PII_TYPE_TO_RULE_ID = {
-    "email": "email",
-    "phone": "phone",
-    "ssn": "ssn",
-    "credit_card": "credit-card",
-    "ipv4": "ipv4",
-    "ipv6": "ipv6",
-    "iban": "iban",
-}
-
-
 def _pii_disabled_rule_ids(cfg) -> list[str]:
+    type_to_rule_id = pii_rules.type_to_rule_id()
     disabled = []
     for key, enabled in cfg.pii.items():
-        if not enabled and key in _PII_TYPE_TO_RULE_ID:
-            disabled.append(_PII_TYPE_TO_RULE_ID[key])
+        if not enabled and key in type_to_rule_id:
+            disabled.append(type_to_rule_id[key])
     return disabled

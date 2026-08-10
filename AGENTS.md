@@ -32,9 +32,15 @@ Run `make ci` before considering any change done. It must be clean.
 oneleak/               the package
   scanner.py            orchestration: candidate generation -> overlap resolution -> findings
                          (read this file first, everything else feeds into it)
-  detectors.py           regex / generic-assignment / entropy candidate generation
-  validators.py           luhn, iban, ssn, ipv4/ipv6, jwt structural checks
+  detectors.py           regex / generic-assignment / entropy candidate generation, shared by
+                          secrets and PII alike (category-agnostic, no branching on it)
+  validators.py           luhn, iban, ssn, ipv4/ipv6, jwt, aba_routing structural checks
   rules.py                rule loading (built-in YAML, custom YAML/JSON, Python rules)
+  secret_rules.py           owns builtin_rules/secrets.yaml's loading. Peer of pii_rules.py:
+                            same job, one per category, everything below rule-loading is shared
+  pii_rules.py               owns builtin_rules/pii.yaml's loading, plus the type -> rule_id
+                              map the `pii:` config toggle uses (derived from pii.yaml, not
+                              hand-maintained, so a new PII rule can't silently fail to toggle)
   sanitizer.py             typed placeholders, referential consistency, mapping/desanitize
   git.py                    scan_changed/staged/history (the one module that shells out)
   cli.py                     argparse CLI
@@ -53,7 +59,7 @@ scripts/benchmark.py    perf timing, not a test
 Two orderings in `scanner.py::scan_text()` are load-bearing, not arbitrary, and have each caused a real bug when gotten wrong before:
 
 1. **Suppression runs before overlap resolution**, not after. Suppressing after resolution can make a narrowly rule-scoped `# oneleak: allow <rule-id>` silently suppress a *different* rule's finding for the same span (the higher-priority rule was suppressed, but the lower-priority rule that would have caught it independently was already discarded during overlap resolution).
-2. **Structural-anchor rules (PEM/JWT/connection-string) outrank provider-specific and PII rules** (priority 110 vs. 90-100), because e.g. a connection-string password can look like an email's `local@domain` shape.
+2. **Structural-anchor rules (PEM/JWT/connection-string) outrank provider-specific and PII rules** (priority 110 vs. 90-100), because e.g. a connection-string password can look like an email's `local@domain` shape. This is also why secrets and PII can't be split into fully independent pipelines: `_resolve_overlaps()` needs both categories' candidates in one pool to resolve exactly this kind of cross-category collision. `secret_rules.py`/`pii_rules.py` own rule *loading* only; matching and overlap resolution stay shared, category-agnostic code in `detectors.py`/`scanner.py`.
 
 Also load-bearing: **every entry point that produces findings from a `Config` must go through `scan_text_with_config()`**, not call `scan_text()` directly. Three different call sites (`scan()`, `git.py`, `sanitizer.py`) each independently reimplemented "apply `disabled_rules`/`allow.paths`/`severity_overrides`" at different points and each one shipped with a bug where it forgot part of it. Don't add a fourth.
 

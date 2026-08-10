@@ -59,6 +59,11 @@ def load_baseline(path: str | Path) -> set[_Key]:
         raise ConfigError(f"{path}: invalid baseline file: {exc.msg} (line {exc.lineno})") from exc
     if not isinstance(data, dict) or not isinstance(data.get("findings"), list):
         raise ConfigError(f"{path}: expected a top-level 'findings' list")
+    if data.get("version") != BASELINE_VERSION:
+        raise ConfigError(
+            f"{path}: unsupported baseline version {data.get('version')!r} "
+            f"(expected {BASELINE_VERSION}); regenerate it with --update-baseline"
+        )
 
     keys: set[_Key] = set()
     for entry in data["findings"]:

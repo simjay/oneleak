@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from importlib import resources
 from pathlib import Path
 
 import yaml
@@ -26,12 +25,40 @@ def _validate_entry(entry: dict, source: str) -> None:
     missing = [f for f in _REQUIRED_FIELDS if f not in entry]
     if missing:
         raise ConfigError(f"rule in {source} is missing required field(s): {', '.join(missing)}")
+
+    # Shape-check every field before anything downstream trusts its type.
+    # Without this, e.g. `priority: "high"` (a plausible mistake: writing a
+    # severity-shaped value in the priority field) doesn't fail here, it
+    # crashes deep inside overlap resolution with a raw, unhandled TypeError.
+    for field_name in _REQUIRED_FIELDS:
+        if not isinstance(entry[field_name], str):
+            raise ConfigError(f"rule in {source}: '{field_name}' must be a string")
+
+    rule_id = entry["id"]
     if entry["category"] not in {c.value for c in Category}:
-        raise ConfigError(f"rule '{entry['id']}' has unknown category: {entry['category']}")
+        raise ConfigError(f"rule '{rule_id}' has unknown category: {entry['category']}")
     if entry["severity"] not in {s.value for s in Severity}:
-        raise ConfigError(f"rule '{entry['id']}' has unknown severity: {entry['severity']}")
+        raise ConfigError(f"rule '{rule_id}' has unknown severity: {entry['severity']}")
     if "pattern" not in entry and "keywords" not in entry:
-        raise ConfigError(f"rule '{entry['id']}' needs at least a pattern or keywords")
+        raise ConfigError(f"rule '{rule_id}' needs at least a pattern or keywords")
+
+    pattern = entry.get("pattern")
+    if pattern is not None and not isinstance(pattern, str):
+        raise ConfigError(f"rule '{rule_id}': 'pattern' must be a string")
+
+    keywords = entry.get("keywords")
+    if keywords is not None and (
+        not isinstance(keywords, list) or not all(isinstance(k, str) for k in keywords)
+    ):
+        raise ConfigError(f"rule '{rule_id}': 'keywords' must be a list of strings")
+
+    validator = entry.get("validator")
+    if validator is not None and not isinstance(validator, str):
+        raise ConfigError(f"rule '{rule_id}': 'validator' must be a string")
+
+    priority = entry.get("priority")
+    if priority is not None and not isinstance(priority, int):
+        raise ConfigError(f"rule '{rule_id}': 'priority' must be an integer")
 
 
 def _compile_pattern(entry: dict) -> re.Pattern[str] | None:
@@ -124,13 +151,15 @@ class RuleRegistry:
         self.load_entries(parse_json_rules(text, str(path)), str(path))
 
     def load_builtin(self) -> None:
-        for filename in ("secrets.yaml", "pii.yaml"):
-            text = (
-                resources.files("oneleak.builtin_rules")
-                .joinpath(filename)
-                .read_text(encoding="utf-8")
-            )
-            self.load_yaml_text(text, source=f"builtin:{filename}")
+        # Local import: secret_rules.py/pii_rules.py import parse_yaml_rules
+        # from this module, so importing them at module level here would cycle.
+        from oneleak import pii_rules, secret_rules
+
+        for source, entries in (
+            (f"builtin:{secret_rules.BUILTIN_FILENAME}", secret_rules.builtin_entries()),
+            (f"builtin:{pii_rules.BUILTIN_FILENAME}", pii_rules.builtin_entries()),
+        ):
+            self.load_entries(list(entries), source=source)
 
     def load_source(self, source) -> None:
         """Accepts a path (str/Path) to a .yaml/.yml/.json rule file, a Rule,

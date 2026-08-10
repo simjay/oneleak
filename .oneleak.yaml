@@ -12,8 +12,11 @@ allow:
   paths:
     - ".plan/**"
     - "docs/**"
-    - "tests/**"     # fake-but-realistic secrets are the whole point of positive tests
-    - "scripts/**"   # benchmark.py uses fake emails/keys as synthetic scan content
+    - "tests/**"                    # fake-but-realistic secrets are the whole point of positive tests
+    - "scripts/**"                  # benchmark.py uses fake emails/keys as synthetic scan content
+    - "oneleak/builtin_rules/**"    # rule *patterns*, not real secrets. A fully-literal
+                                     # pattern (e.g. pgp-private-key's BEGIN/END markers)
+                                     # can match its own definition
     - "README.md"
     - "CHANGELOG.md"
     - "CONTRIBUTING.md"

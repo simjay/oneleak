@@ -154,6 +154,16 @@ def ipv6(value: str) -> bool:
         return False
 
 
+def aba_routing(value: str) -> bool:
+    """US ABA bank routing number checksum: 3/7/1-weighted digit sum mod 10 == 0."""
+    digits = value.replace("-", "").replace(" ", "")
+    if len(digits) != 9 or not digits.isdigit():
+        return False
+    weights = (3, 7, 1, 3, 7, 1, 3, 7, 1)
+    total = sum(int(d) * w for d, w in zip(digits, weights, strict=True))
+    return total % 10 == 0
+
+
 def jwt(value: str) -> bool:
     """Structural anchor: three dot-separated base64url segments, header decodes to JSON
     containing 'alg'. Does not verify the signature.
@@ -178,4 +188,5 @@ VALIDATORS = {
     "ipv4": ipv4,
     "ipv6": ipv6,
     "jwt": jwt,
+    "aba_routing": aba_routing,
 }

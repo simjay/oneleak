@@ -9,6 +9,7 @@ import yaml
 
 from oneleak.errors import ConfigError, read_text_file, yaml_error_detail
 from oneleak.models import Severity
+from oneleak.pii_rules import known_types as known_pii_types
 
 _KNOWN_TOP_LEVEL_KEYS = {
     "version",
@@ -20,7 +21,6 @@ _KNOWN_TOP_LEVEL_KEYS = {
     "severity_overrides",
 }
 
-_KNOWN_PII_KEYS = {"email", "phone", "ssn", "credit_card", "ipv4", "ipv6", "iban"}
 _KNOWN_SEVERITIES = {s.value for s in Severity}
 
 
@@ -46,8 +46,31 @@ def _validate_top_level(data: dict, source: str) -> None:
         raise ConfigError(f"{source}: unknown config field(s): {', '.join(sorted(unknown))}")
 
 
+def _require_list_of_str(value, field_name: str, source: str) -> list:
+    """Guards every list-shaped field before it's consumed. Without this, a
+    field given as a bare string (a plausible typo: `exclude: "foo/**"`
+    instead of `exclude: ["foo/**"]`) silently iterates character-by-character
+    instead of raising, since `list("foo/**")` is valid Python and just
+    produces the wrong list.
+    """
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise ConfigError(f"{source}: '{field_name}' must be a list of strings")
+    return value
+
+
+def _require_mapping(value, field_name: str, source: str) -> dict:
+    """Guards every mapping-shaped field before it's consumed. Without this,
+    a field given as a list (e.g. `pii: [email, phone]` instead of
+    `pii: {email: true, phone: true}`) reaches `dict(...)` and raises a raw
+    `ValueError` instead of a clean `ConfigError`.
+    """
+    if not isinstance(value, dict):
+        raise ConfigError(f"{source}: '{field_name}' must be a mapping")
+    return value
+
+
 def _validate_pii(pii: dict, source: str) -> None:
-    unknown = set(pii) - _KNOWN_PII_KEYS
+    unknown = set(pii) - known_pii_types()
     if unknown:
         raise ConfigError(f"{source}: unknown pii detector(s): {', '.join(sorted(unknown))}")
 
@@ -69,22 +92,31 @@ def parse_config(text: str, source: str = "<config>") -> Config:
         raise ConfigError(f"{source}: expected a YAML mapping at the top level")
     _validate_top_level(data, source)
 
-    pii = data.get("pii", {}) or {}
+    exclude = _require_list_of_str(data.get("exclude") or [], "exclude", source)
+    rule_paths = _require_list_of_str(data.get("rule_paths") or [], "rule_paths", source)
+    disabled_rules = _require_list_of_str(
+        data.get("disabled_rules") or [], "disabled_rules", source
+    )
+
+    pii = _require_mapping(data.get("pii") or {}, "pii", source)
     _validate_pii(pii, source)
 
-    severity_overrides = dict(data.get("severity_overrides", {}) or {})
+    severity_overrides = _require_mapping(
+        data.get("severity_overrides") or {}, "severity_overrides", source
+    )
     _validate_severity_overrides(severity_overrides, source)
 
-    allow = data.get("allow", {}) or {}
+    allow = _require_mapping(data.get("allow") or {}, "allow", source)
+    allow_paths = _require_list_of_str(allow.get("paths") or [], "allow.paths", source)
 
     return Config(
         version=data.get("version", 1),
-        exclude=list(data.get("exclude", []) or []),
+        exclude=list(exclude),
         pii=dict(pii),
-        rule_paths=list(data.get("rule_paths", []) or []),
-        allow_paths=list(allow.get("paths", []) or []),
-        disabled_rules=list(data.get("disabled_rules", []) or []),
-        severity_overrides=severity_overrides,
+        rule_paths=list(rule_paths),
+        allow_paths=list(allow_paths),
+        disabled_rules=list(disabled_rules),
+        severity_overrides=dict(severity_overrides),
     )
 
 

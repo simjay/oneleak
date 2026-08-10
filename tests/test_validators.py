@@ -15,6 +15,30 @@ class TestLuhn:
         assert not validators.luhn("411111111111111a")
 
 
+class TestLuhnAsIMEIChecksum:
+    def test_valid_imei(self):
+        # IMEI's real check digit is the Luhn algorithm, the standard textbook
+        # example IMEI used to illustrate it.
+        assert validators.luhn("490154203237518")
+
+    def test_invalid_imei_checksum(self):
+        assert not validators.luhn("490154203237519")
+
+
+class TestABARouting:
+    def test_valid(self):
+        assert validators.aba_routing("021000021")
+
+    def test_invalid_checksum(self):
+        assert not validators.aba_routing("021000022")
+
+    def test_wrong_length(self):
+        assert not validators.aba_routing("02100002")
+
+    def test_non_digit(self):
+        assert not validators.aba_routing("02100002a")
+
+
 class TestSSN:
     def test_valid(self):
         assert validators.ssn("123-45-6789")

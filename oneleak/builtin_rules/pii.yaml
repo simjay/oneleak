@@ -1,3 +1,25 @@
+# Structured PII patterns.
+#
+# Priority uses the same overlap-resolution tiers as secrets.yaml (see that
+# file's header): PII candidates and secret candidates compete for the same
+# span through one shared resolution step (e.g. a connection-string
+# password can look like an email's local@domain shape), so the tiers are
+# shared, not redefined here.
+#
+# secrets.yaml's precision/severity/naming criteria all still apply. Two
+# things specific to PII, on top of those:
+#
+# 1. Evidence. Most PII values have no vendor-issued prefix to anchor on
+#    (unlike a secret's "sk-" or "ghp_"), so precision here leans on a real
+#    checksum (ssn, luhn, iban, aba_routing) or full structural shape
+#    (ipv4/ipv6/mac-address) rather than a literal anchor. A bare,
+#    unvalidated, unstructured pattern is the wrong shape for a PII rule.
+#
+# 2. Severity trends low/medium, not high/critical: a leaked email or phone
+#    number is rarely as immediately actionable as a leaked credential.
+#    ssn/credit-card/imei are the deliberate exceptions (high/medium),
+#    since those specific values enable direct fraud on their own.
+
 rules:
   - id: email
     category: pii
@@ -52,3 +74,35 @@ rules:
     pattern: '\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b'
     validator: iban
     priority: 100
+
+  - id: imei
+    category: pii
+    type: imei
+    severity: medium
+    # IMEI's real check digit is the Luhn algorithm, the same one credit-card
+    # uses, legitimate reuse rather than a coincidence. But that means a bare
+    # 15-digit Luhn-valid number is genuinely ambiguous with an Amex card
+    # (also 15 digits, also Luhn), not just a tie-break question: keyword
+    # context is required to fire at all, and outranks credit-card's 100
+    # when present, since "imei: <digits>" is strong evidence it's a device
+    # ID, not a card number.
+    pattern: '\b\d{15}\b'
+    keywords: ["imei", "device id", "device_id", "serial number"]
+    validator: luhn
+    priority: 105
+
+  - id: mac-address
+    category: pii
+    type: mac_address
+    severity: low
+    pattern: '\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b'
+    priority: 80
+
+  - id: bank-routing-number
+    category: pii
+    type: bank_routing_number
+    severity: medium
+    pattern: '\b\d{9}\b'
+    keywords: ["routing", "routing number", "routing_number", "aba", "aba number"]
+    validator: aba_routing
+    priority: 90

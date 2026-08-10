@@ -76,6 +76,18 @@ class TestWriteAndLoad:
         with pytest.raises(ConfigError):
             load_baseline(baseline_path)
 
+    def test_wrong_version_raises_config_error(self, tmp_path: Path):
+        baseline_path = tmp_path / "baseline.json"
+        baseline_path.write_text(json.dumps({"version": 2, "findings": []}), encoding="utf-8")
+        with pytest.raises(ConfigError, match="version"):
+            load_baseline(baseline_path)
+
+    def test_missing_version_raises_config_error(self, tmp_path: Path):
+        baseline_path = tmp_path / "baseline.json"
+        baseline_path.write_text(json.dumps({"findings": []}), encoding="utf-8")
+        with pytest.raises(ConfigError, match="version"):
+            load_baseline(baseline_path)
+
 
 class TestFilterNew:
     def test_excludes_baselined_findings(self):

@@ -29,7 +29,7 @@ result = oneleak.scan(text, rules=["company-rules.yaml"])
 | `severity` | yes | `low`, `medium`, `high`, or `critical`. |
 | `pattern` | one of pattern/keywords | Regex. Use a named group `value` to have the finding span only that group (e.g. matching just the password portion of a connection string) instead of the whole match. |
 | `keywords` | optional | If present, a match must also have one of these keywords nearby (same line, ~60 chars back) to count, which reduces false positives on generic patterns. |
-| `validator` | optional | Name of a built-in validator to confirm the match: `luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`. |
+| `validator` | optional | Name of a built-in validator to confirm the match: `luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`, `aba_routing`. |
 | `priority` | optional | Overlap-resolution tier: higher wins when two rules match the same span. Defaults to 80 if a pattern is present, 60 if keyword-only. Built-in provider/structural rules use 90-110, and the built-in generic-assignment and entropy detectors use 50 and 10 respectively. |
 
 Declarative YAML/JSON rules can never execute arbitrary code. This is a hard security boundary, not just a convention.
