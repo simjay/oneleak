@@ -6,7 +6,11 @@
 
 exclude:
   - "site/**"   # mkdocs build output, gitignored, may exist locally
-  - "uv.lock"   # gitignored, package-hash URLs are noisy, non-secret entropy
+  - "uv.lock"   # package-hash URLs are noisy, non-secret entropy. Skips scanning
+                # it entirely for directory-walk scans (scan(), `oneleak scan .`).
+                # git-based scans (--staged/--changed/--history) never consult
+                # `exclude` at all, only `allow.paths` below, so uv.lock is
+                # listed in both.
 
 allow:
   paths:
@@ -17,6 +21,7 @@ allow:
     - "oneleak/builtin_rules/**"    # rule *patterns*, not real secrets. A fully-literal
                                      # pattern (e.g. pgp-private-key's BEGIN/END markers)
                                      # can match its own definition
+    - "uv.lock"                     # see the `exclude` entry above for why it's here too
     - "README.md"
     - "CHANGELOG.md"
     - "CONTRIBUTING.md"

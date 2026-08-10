@@ -10,7 +10,6 @@ __pycache__/
 dist/
 build/
 site/
-uv.lock
 .oneleak-map.json
 *.oneleak-map.json
 
