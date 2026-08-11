@@ -588,6 +588,18 @@ class TestFileAndDirectoryScanning:
         paths = {f.path for f in result.findings}
         assert paths == {"app.py"}
 
+    def test_scan_directory_excludes_local_tool_caches(self, tmp_path: Path):
+        # .pytest_cache/.mypy_cache/.ruff_cache/.hypothesis are all gitignored,
+        # never committed, but a directory scan walks the real filesystem
+        # regardless of git status, so they need their own exclusion.
+        for cache_dir in (".pytest_cache", ".mypy_cache", ".ruff_cache", ".hypothesis"):
+            d = tmp_path / cache_dir
+            d.mkdir()
+            (d / "artifact.txt").write_text("sk-proj-" + "a" * 20)
+        (tmp_path / "app.py").write_text("x = 1\n")
+        result = oneleak.scan(tmp_path)
+        assert result.safe
+
     def test_binary_file_skipped(self, tmp_path: Path):
         f = tmp_path / "binary.dat"
         f.write_bytes(b"\x00\x01\x02sk-proj-" + b"a" * 20)

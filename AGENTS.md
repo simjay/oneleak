@@ -49,7 +49,8 @@ oneleak/               the package
   config.py                       .oneleak.yaml loading, strict unknown-field rejection
   models.py                        Finding, ScanResult, Rule, etc.
   builtin_rules/*.yaml               declarative secret/PII rules
-tests/                  one test file per oneleak/ module, plus test_properties.py (Hypothesis)
+tests/                  one test file per oneleak/ module, plus test_properties.py (Hypothesis),
+                        plus test_e2e_cli.py/test_e2e_mcp.py (real subprocess/real stdio, see below)
 docs/                   published docs (mkdocs). docs/architecture.md explains the pipeline in detail
 scripts/benchmark.py    perf timing, not a test
 ```
@@ -68,6 +69,7 @@ Also load-bearing: **every entry point that produces findings from a `Config` mu
 - **Never store or log a raw sensitive value** outside of `SanitizedResult.mapping` (only populated when the caller explicitly passes `reveal=True`) and mapping files written via `--map` (always `0600`, always with a "don't commit this" warning). `Finding` never carries a raw value, only `preview` (masked) and `fingerprint` (HMAC, one-way).
 - **Test fixtures use fake-but-realistic values only**, e.g. `"sk-proj-" + "a" * 20`, never a real or even expired/revoked credential. This is enforced by convention, not tooling. Don't break it.
 - **New built-in rule -> three tests**: positive (realistic match detected), negative (adjacent non-match isn't), boundary (off-by-one length/prefix). See `tests/test_scanner.py::TestProviderRules` for the pattern.
+- **Two test tiers, different jobs.** Everything except `test_e2e_*.py` calls into oneleak's Python API/internal functions directly, fast and precise about which function is under test. `test_e2e_cli.py` spawns `oneleak` as a real subprocess (`sys.executable -m oneleak.cli`, not the installed console script, so it needs no PATH assumptions) and `test_e2e_mcp.py` spawns the MCP server and talks to it over real stdio via the `mcp` SDK's client transport. These exist to catch what only shows up crossing a real process boundary (entry-point/packaging breakage, exit codes, stdin/stdout/stderr framing, real git subprocess interaction) — they deliberately re-cover some of the same ground as the unit-level CLI/MCP tests, that overlap is the point, not a redundancy to clean up. Add a new unit-level test for a new flag/behavior; add to the e2e suite only when the thing being tested genuinely depends on crossing that boundary.
 - **Regex quantifiers on secret patterns must be bounded** (`{20,100}`, not `{20,}`). An unbounded quantifier let a match run away across trailing content with no separator. See the git history / CHANGELOG for the exact failure mode before "fixing" this differently.
 - **Declarative YAML/JSON rules never execute code. Python rules are never auto-loaded** from repo config, only from explicit `rules=[...]` in caller code. This is a security boundary, not a style choice. Don't add a mechanism that auto-discovers Python rule files from a repo.
 - **Simplicity over speculative flexibility.** This codebase has twice had a pass that found and removed fields/config options that were parsed but never consumed (`Rule.min_entropy`, `Config.sanitize`, etc.). Don't add a config knob or model field before something actually reads it.

@@ -36,6 +36,13 @@ DEFAULT_EXCLUDED_DIR_NAMES = {
     "__pycache__",
     "dist",
     "build",
+    # Local tool caches: never committed (all gitignored), but a directory
+    # scan walks the real filesystem regardless of git status, and test
+    # node IDs / cached artifacts in these can trip the entropy detector.
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".hypothesis",
 }
 
 _INLINE_ALLOW_RE = re.compile(r"#\s*oneleak:\s*allow(?:\s+(?P<rule_id>[\w-]+))?", re.IGNORECASE)
