@@ -79,13 +79,10 @@ rules:
     category: pii
     type: imei
     severity: medium
-    # IMEI's real check digit is the Luhn algorithm, the same one credit-card
-    # uses, legitimate reuse rather than a coincidence. But that means a bare
-    # 15-digit Luhn-valid number is genuinely ambiguous with an Amex card
-    # (also 15 digits, also Luhn), not just a tie-break question: keyword
-    # context is required to fire at all, and outranks credit-card's 100
-    # when present, since "imei: <digits>" is strong evidence it's a device
-    # ID, not a card number.
+    # IMEI's check digit is the Luhn algorithm, same as credit-card. A bare
+    # 15-digit Luhn-valid number is ambiguous with an Amex card, so keyword
+    # context is required, and outranks credit-card's priority 100 when
+    # present.
     pattern: '\b\d{15}\b'
     keywords: ["imei", "device id", "device_id", "serial number"]
     validator: luhn

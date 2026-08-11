@@ -1179,7 +1179,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0,<2.0" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6" },
+    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6,<2.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.26" },
     { name = "pyyaml", specifier = ">=6.0" },

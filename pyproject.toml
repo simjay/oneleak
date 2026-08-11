@@ -45,7 +45,11 @@ Changelog = "https://github.com/simjay/oneleak/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 docs = [
-    "mkdocs>=1.6",
+    # Pinned below 2.0: it drops the plugin system with no migration path
+    # (https://squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/),
+    # which would break this docs build. mkdocs-material's own constraint
+    # covers this today, but not once mkdocs-material itself moves past it.
+    "mkdocs>=1.6,<2.0",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.26",
 ]

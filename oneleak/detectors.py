@@ -153,12 +153,10 @@ def entropy_candidates(
 ) -> list[RuleMatch]:
     """Only considers base64-alphabet candidates. Pure-hex runs (git hashes,
     checksums) and canonical UUID shapes are excluded via dedicated checks
-    rather than relying on entropy to catch them, since entropy alone can't
-    distinguish structured-but-random-looking data from a real secret. See
-    docs/concepts.md for why a BPE-tokenizer-based scorer (as used by
-    Betterleaks) was evaluated and not adopted: measured on oneleak's own
-    candidate set it doesn't separate real secrets from the false-positive
-    classes those two checks don't already handle.
+    rather than relying on entropy, since entropy alone can't distinguish
+    structured-but-random-looking data from a real secret. See
+    docs/concepts.md for why token-efficiency scoring (BPE, as used by
+    Betterleaks) isn't used here instead.
     """
     matches: list[RuleMatch] = []
     for m in _BASE64_CANDIDATE_RE.finditer(text):
@@ -166,7 +164,7 @@ def entropy_candidates(
         if len(candidate) < min_length:
             continue
         if all(c in "0123456789abcdefABCDEF" for c in candidate):
-            continue  # pure hex: hash/commit-id false-positive trap, skip in v0.1
+            continue  # pure hex: indistinguishable from a git hash/commit ID by entropy alone
         if _UUID_RE.match(candidate):
             continue
         if len(set(candidate)) <= 2:
