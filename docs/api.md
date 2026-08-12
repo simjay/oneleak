@@ -1,66 +1,66 @@
 # API Reference
 
-The public surface is intentionally small. Everything below is importable directly from `oneleak` (e.g. `oneleak.Config`, `oneleak.RuleMatch`), except the `git` functions, which live under `oneleak.git`:
+The public surface is intentionally small. Everything below is importable directly from `oneleaks` (e.g. `oneleaks.Config`, `oneleaks.RuleMatch`), except the `git` functions, which live under `oneleaks.git`:
 
 ```python
-import oneleak
+import oneleaks
 
-oneleak.scan(...)
-oneleak.sanitize(...)
-oneleak.desanitize(...)
-oneleak.git.scan_changed(...)
-oneleak.git.scan_staged(...)
-oneleak.git.scan_history(...)
+oneleaks.scan(...)
+oneleaks.sanitize(...)
+oneleaks.desanitize(...)
+oneleaks.git.scan_changed(...)
+oneleaks.git.scan_staged(...)
+oneleaks.git.scan_history(...)
 ```
 
 ## Scanning and sanitizing
 
-::: oneleak.scanner.scan
+::: oneleaks.scanner.scan
 
-::: oneleak.sanitizer.sanitize
+::: oneleaks.sanitizer.sanitize
 
-::: oneleak.sanitizer.desanitize
+::: oneleaks.sanitizer.desanitize
 
 ## Git
 
-::: oneleak.git.scan_changed
+::: oneleaks.git.scan_changed
 
-::: oneleak.git.scan_staged
+::: oneleaks.git.scan_staged
 
-::: oneleak.git.scan_history
+::: oneleaks.git.scan_history
 
 ## Configuration
 
-`Config` mirrors `.oneleak.yaml` for callers who want to build one directly instead of loading a file. See [Configuration](configuration.md) for the YAML shape and field descriptions.
+`Config` mirrors `.oneleaks.yaml` for callers who want to build one directly instead of loading a file. See [Configuration](configuration.md) for the YAML shape and field descriptions.
 
-::: oneleak.config.Config
+::: oneleaks.config.Config
 
 ## Models
 
-::: oneleak.models.Finding
+::: oneleaks.models.Finding
 
-::: oneleak.models.ScanResult
+::: oneleaks.models.ScanResult
 
-::: oneleak.models.SanitizedResult
+::: oneleaks.models.SanitizedResult
 
-::: oneleak.models.MappingEntry
+::: oneleaks.models.MappingEntry
 
-::: oneleak.models.Rule
+::: oneleaks.models.Rule
 
-::: oneleak.models.RuleMatch
+::: oneleaks.models.RuleMatch
 
-::: oneleak.models.PythonRule
+::: oneleaks.models.PythonRule
 
-::: oneleak.models.Category
+::: oneleaks.models.Category
 
-::: oneleak.models.Severity
+::: oneleaks.models.Severity
 
 ## Errors
 
-Every error oneleak raises deliberately is an `OneleakError`. Catch that if you don't need to distinguish the subclass, or catch the specific one for finer-grained handling.
+Every error oneleaks raises deliberately is an `OneleaksError`. Catch that if you don't need to distinguish the subclass, or catch the specific one for finer-grained handling.
 
-::: oneleak.errors.OneleakError
+::: oneleaks.errors.OneleaksError
 
-::: oneleak.errors.ConfigError
+::: oneleaks.errors.ConfigError
 
-::: oneleak.errors.ScanError
+::: oneleaks.errors.ScanError

@@ -1,4 +1,4 @@
-from oneleak.models import Finding, ScanResult
+from oneleaks.models import Finding, ScanResult
 
 
 def _finding(severity):

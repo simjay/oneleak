@@ -10,8 +10,8 @@ __pycache__/
 dist/
 build/
 site/
-.oneleak-map.json
-*.oneleak-map.json
+.oneleaks-map.json
+*.oneleaks-map.json
 
 # Internal planning docs, not meant to be published in repo history
 .plan/

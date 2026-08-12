@@ -16,8 +16,8 @@ import tempfile
 import time
 from pathlib import Path
 
-import oneleak
-from oneleak import git
+import oneleaks
+from oneleaks import git
 
 _LOREM = (
     "def process_request(user_id, payload):\n"
@@ -48,7 +48,7 @@ def bench_text_sizes() -> None:
     print("\n== Text scanning ==")
     for label, size in [("1 KB text", 1024), ("1 MB text", 1024 * 1024)]:
         text = _repeat_to_size(_LOREM, size) + _SECRET_LINE
-        elapsed = _time(label, lambda t=text: oneleak.scan(t))
+        elapsed = _time(label, lambda t=text: oneleaks.scan(t))
         mb = len(text.encode("utf-8")) / (1024 * 1024)
         print(f"    -> {mb / elapsed:.1f} MB/s" if elapsed > 0 else "    -> instant")
 
@@ -56,7 +56,7 @@ def bench_text_sizes() -> None:
         "version: 1\nexclude:\n  - node_modules/**\npii:\n  email: true\n"
         f"# fake config comment\napi_key: sk-proj-{'a' * 30}\n"
     )
-    _time("config-file-sized input", lambda: oneleak.scan(config_text))
+    _time("config-file-sized input", lambda: oneleaks.scan(config_text))
 
 
 def _make_synthetic_repo(base: Path, n_files: int) -> None:
@@ -73,7 +73,7 @@ def bench_directory_scans() -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _make_synthetic_repo(base, n_files)
-            elapsed = _time(label, lambda b=base: oneleak.scan(b))
+            elapsed = _time(label, lambda b=base: oneleaks.scan(b))
             print(f"    -> {n_files / elapsed:.1f} files/s" if elapsed > 0 else "    -> instant")
 
 
@@ -97,7 +97,7 @@ def bench_git_changed() -> None:
 
 
 def main() -> None:
-    print("oneleak benchmark -- not a CI gate, just eyeball for regressions")
+    print("oneleaks benchmark -- not a CI gate, just eyeball for regressions")
     bench_text_sizes()
     bench_directory_scans()
     bench_git_changed()

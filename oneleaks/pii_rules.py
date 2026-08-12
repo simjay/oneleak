@@ -13,7 +13,7 @@ from __future__ import annotations
 from functools import lru_cache
 from importlib import resources
 
-from oneleak.rules import parse_yaml_rules
+from oneleaks.rules import parse_yaml_rules
 
 BUILTIN_FILENAME = "pii.yaml"
 
@@ -21,7 +21,7 @@ BUILTIN_FILENAME = "pii.yaml"
 @lru_cache(maxsize=1)
 def builtin_entries() -> tuple[dict, ...]:
     text = (
-        resources.files("oneleak.builtin_rules")
+        resources.files("oneleaks.builtin_rules")
         .joinpath(BUILTIN_FILENAME)
         .read_text(encoding="utf-8")
     )
@@ -30,7 +30,7 @@ def builtin_entries() -> tuple[dict, ...]:
 
 @lru_cache(maxsize=1)
 def known_types() -> frozenset[str]:
-    """Every `type` a builtin PII rule declares. This is what `.oneleak.yaml`'s
+    """Every `type` a builtin PII rule declares. This is what `.oneleaks.yaml`'s
     `pii: {<type>: bool}` block validates against, derived from pii.yaml
     itself so a new builtin PII rule is automatically toggleable without a
     matching Python edit anywhere else.

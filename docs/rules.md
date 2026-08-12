@@ -18,7 +18,7 @@ rules:
 ```
 
 ```python
-result = oneleak.scan(text, rules=["company-rules.yaml"])
+result = oneleaks.scan(text, rules=["company-rules.yaml"])
 ```
 
 | Field | Required | Description |
@@ -59,8 +59,8 @@ Same shape, JSON-encoded:
 For detection logic that can't be expressed as a regex (a proprietary checksum, an internal ID format):
 
 ```python
-import oneleak
-from oneleak import PythonRule, RuleMatch
+import oneleaks
+from oneleaks import PythonRule, RuleMatch
 
 class EmployeeIdRule(PythonRule):
     id = "employee-id"
@@ -74,7 +74,7 @@ class EmployeeIdRule(PythonRule):
             return []
         return [RuleMatch(start=idx, end=idx + 10)]
 
-result = oneleak.scan(text, rules=[EmployeeIdRule()])
+result = oneleaks.scan(text, rules=[EmployeeIdRule()])
 ```
 
 Python rules are **never** auto-loaded from repository config, only from an explicit `rules=[...]` argument in your own code. A rule this powerful being silently pulled in from a file anyone could add to a repo would be a real remote-code-execution vector. Requiring explicit registration is a hard security boundary, matching the constraint on YAML/JSON rules above.
@@ -82,8 +82,8 @@ Python rules are **never** auto-loaded from repository config, only from an expl
 ## Inline suppression
 
 ```python
-TOKEN = "fake-secret"  # oneleak: allow
-TOKEN = "fake-secret"  # oneleak: allow generic-secret   (scoped to one rule ID)
+TOKEN = "fake-secret"  # oneleaks: allow
+TOKEN = "fake-secret"  # oneleaks: allow generic-secret   (scoped to one rule ID)
 ```
 
 See [Configuration](configuration.md) for path/rule-level exclusions and allowlisting.

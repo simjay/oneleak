@@ -1,5 +1,5 @@
 """Tests the MCP tool functions directly (not over a real stdio transport,
-the protocol framing is the `mcp` SDK's responsibility, not oneleak's). What
+the protocol framing is the `mcp` SDK's responsibility, not oneleaks's). What
 needs testing here is that each tool produces correct, JSON-serializable
 output matching the CLI's shapes.
 """
@@ -10,7 +10,7 @@ pytest.importorskip("mcp")
 
 from pathlib import Path
 
-from oneleak.mcp_server import (
+from oneleaks.mcp_server import (
     desanitize_text,
     sanitize_text,
     scan_path,

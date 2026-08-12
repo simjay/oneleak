@@ -13,19 +13,19 @@ import secrets
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from oneleak import pii_rules
-from oneleak.config import Config, load_config
-from oneleak.detectors import (
+from oneleaks import pii_rules
+from oneleaks.config import Config, load_config
+from oneleaks.detectors import (
     entropy_candidates,
     generic_assignment_candidates,
     regex_candidates,
 )
-from oneleak.errors import ScanError
-from oneleak.models import Finding, Rule, ScanResult
-from oneleak.rules import ENTROPY_PRIORITY as _ENTROPY_PRIORITY
-from oneleak.rules import GENERIC_ASSIGNMENT_PRIORITY as _GENERIC_PRIORITY
-from oneleak.rules import RuleRegistry
-from oneleak.validators import VALIDATORS
+from oneleaks.errors import ScanError
+from oneleaks.models import Finding, Rule, ScanResult
+from oneleaks.rules import ENTROPY_PRIORITY as _ENTROPY_PRIORITY
+from oneleaks.rules import GENERIC_ASSIGNMENT_PRIORITY as _GENERIC_PRIORITY
+from oneleaks.rules import RuleRegistry
+from oneleaks.validators import VALIDATORS
 
 DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 DEFAULT_EXCLUDED_DIR_NAMES = {
@@ -45,7 +45,7 @@ DEFAULT_EXCLUDED_DIR_NAMES = {
     ".hypothesis",
 }
 
-_INLINE_ALLOW_RE = re.compile(r"#\s*oneleak:\s*allow(?:\s+(?P<rule_id>[\w-]+))?", re.IGNORECASE)
+_INLINE_ALLOW_RE = re.compile(r"#\s*oneleaks:\s*allow(?:\s+(?P<rule_id>[\w-]+))?", re.IGNORECASE)
 
 _GENERIC_ASSIGNMENT_RULE = Rule(
     id="generic-secret",
@@ -100,7 +100,7 @@ _FINGERPRINT_PREFIX = {"secret": "sec", "pii": "pii", "sensitive": "sen"}
 def _fingerprint_key(explicit_key: bytes | None) -> bytes:
     if explicit_key is not None:
         return explicit_key
-    env = os.environ.get("ONELEAK_FINGERPRINT_KEY")
+    env = os.environ.get("ONELEAKS_FINGERPRINT_KEY")
     if env:
         return env.encode("utf-8")
     global _SESSION_KEY
@@ -236,7 +236,7 @@ def scan_text(
 ) -> list[Finding]:
     candidates = _generate_candidates(text, registry)
     candidates = [c for c in candidates if c.rule.id not in disabled_rules]
-    # Suppress before resolving overlaps: a rule-scoped `# oneleak: allow <id>`
+    # Suppress before resolving overlaps: a rule-scoped `# oneleaks: allow <id>`
     # must only remove that one rule's candidate, leaving any other
     # (non-allow-listed, lower-priority) rule that matches the same span free
     # to win the overlap and still be reported. Suppressing after overlap
@@ -432,7 +432,7 @@ def resolve_config(config):
 def _disabled_rule_ids(cfg) -> frozenset[str]:
     """Rule IDs disabled by config: explicit `disabled_rules` plus any PII
     detector turned off via `pii: {<type>: false}`. Shared by every scan
-    entry point (scan(), oneleak.git's scan_changed()/scan_staged(), and
+    entry point (scan(), oneleaks.git's scan_changed()/scan_staged(), and
     sanitize()) so config behaves consistently everywhere, not just on
     whichever path got it first.
     """
@@ -477,7 +477,7 @@ def scan_text_with_config(
 ) -> list[Finding]:
     """scan_text() plus the full config pipeline (disabled rules going in,
     severity overrides and allow-paths coming out). The single code path
-    scan(), oneleak.git, and sanitize() all share for single-text scanning.
+    scan(), oneleaks.git, and sanitize() all share for single-text scanning.
     """
     findings = scan_text(
         text,

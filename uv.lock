@@ -1149,7 +1149,7 @@ wheels = [
 ]
 
 [[package]]
-name = "oneleak"
+name = "oneleaks"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

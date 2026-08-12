@@ -1,9 +1,9 @@
 """Exception hierarchy, plus helpers for turning low-level failures into clean
-oneleak errors.
+oneleaks errors.
 
 Error messages must never dump raw sensitive content, and, just as
-importantly for anyone running oneleak in CI, they must never surface a raw
-Python exception type. `cli.py::main()` renders any `OneleakError` as a plain
+importantly for anyone running oneleaks in CI, they must never surface a raw
+Python exception type. `cli.py::main()` renders any `OneleaksError` as a plain
 `error: <message>`. Anything else falls through to a generic handler that
 prints the exception class name. So raising the right type here *is* the
 user-facing error-message fix.
@@ -16,17 +16,17 @@ from pathlib import Path
 import yaml
 
 
-class OneleakError(Exception):
-    """Base class for every error oneleak raises deliberately. Catch this to
-    handle any oneleak failure without needing to know which subclass it is.
+class OneleaksError(Exception):
+    """Base class for every error oneleaks raises deliberately. Catch this to
+    handle any oneleaks failure without needing to know which subclass it is.
     """
 
 
-class ConfigError(OneleakError):
+class ConfigError(OneleaksError):
     """Bad rule/config definitions: duplicate IDs, invalid regex, unknown fields."""
 
 
-class ScanError(OneleakError):
+class ScanError(OneleaksError):
     """Runtime scanning failures (unreadable path, etc.)."""
 
 

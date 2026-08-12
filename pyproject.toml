@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "oneleak"
-# Single source of truth is oneleak/__init__.py's __version__, read by hatch
-# below, so `oneleak --version` and the packaged version can never drift.
+name = "oneleaks"
+# Single source of truth is oneleaks/__init__.py's __version__, read by hatch
+# below, so `oneleaks --version` and the packaged version can never drift.
 dynamic = ["version"]
 description = "A lightweight, pure-Python sensitive-data scanner and sanitizer for developer and agent workflows."
 readme = "README.md"
@@ -37,11 +37,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/simjay/oneleak"
-Documentation = "https://oneleak.readthedocs.io/"
-Repository = "https://github.com/simjay/oneleak"
-Issues = "https://github.com/simjay/oneleak/issues"
-Changelog = "https://github.com/simjay/oneleak/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/simjay/oneleaks"
+Documentation = "https://oneleaks.readthedocs.io/"
+Repository = "https://github.com/simjay/oneleaks"
+Issues = "https://github.com/simjay/oneleaks/issues"
+Changelog = "https://github.com/simjay/oneleaks/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 docs = [
@@ -60,14 +60,14 @@ mcp = [
 ]
 
 [project.scripts]
-oneleak = "oneleak.cli:main"
-oneleak-mcp = "oneleak.mcp_server:main"
+oneleaks = "oneleaks.cli:main"
+oneleaks-mcp = "oneleaks.mcp_server:main"
 
 [tool.hatch.version]
-path = "oneleak/__init__.py"
+path = "oneleaks/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["oneleak"]
+packages = ["oneleaks"]
 
 [dependency-groups]
 dev = [
@@ -105,4 +105,4 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["oneleak"]
+known-first-party = ["oneleaks"]

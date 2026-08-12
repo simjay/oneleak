@@ -3,7 +3,7 @@ name: Publish
 # Tag-triggered release to PyPI using trusted publishing (OIDC), no stored
 # API token. Requires a one-time setup step on pypi.org: register this repo
 # + workflow file + the "pypi" environment below as a trusted publisher for
-# the `oneleak` project (PyPI project settings -> Publishing). Until that's
+# the `oneleaks` project (PyPI project settings -> Publishing). Until that's
 # done, this workflow will run but the publish step will fail authentication.
 #
 # Cut a release with: git tag v0.1.0 && git push origin v0.1.0
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write  # oneleak: allow generic-secret (GH Actions OIDC permission, not a credential)
+      id-token: write  # oneleaks: allow generic-secret (GH Actions OIDC permission, not a credential)
     steps:
       - uses: actions/checkout@v4
 

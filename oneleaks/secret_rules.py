@@ -19,7 +19,7 @@ from __future__ import annotations
 from functools import lru_cache
 from importlib import resources
 
-from oneleak.rules import parse_yaml_rules
+from oneleaks.rules import parse_yaml_rules
 
 BUILTIN_FILENAME = "secrets.yaml"
 
@@ -27,7 +27,7 @@ BUILTIN_FILENAME = "secrets.yaml"
 @lru_cache(maxsize=1)
 def builtin_entries() -> tuple[dict, ...]:
     text = (
-        resources.files("oneleak.builtin_rules")
+        resources.files("oneleaks.builtin_rules")
         .joinpath(BUILTIN_FILENAME)
         .read_text(encoding="utf-8")
     )

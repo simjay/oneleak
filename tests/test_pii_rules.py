@@ -1,6 +1,6 @@
-from oneleak import pii_rules
-from oneleak.config import parse_config
-from oneleak.errors import ConfigError
+from oneleaks import pii_rules
+from oneleaks.config import parse_config
+from oneleaks.errors import ConfigError
 
 
 class TestBuiltinEntries:

@@ -1,10 +1,10 @@
 """MCP server exposing scan/sanitize/desanitize as tools for agent runtimes.
 
-Run with `oneleak-mcp` (installed via `pip install oneleak[mcp]`), or
-`python -m oneleak.mcp_server`. Uses stdio transport, the standard way
+Run with `oneleaks-mcp` (installed via `pip install oneleaks[mcp]`), or
+`python -m oneleaks.mcp_server`. Uses stdio transport, the standard way
 local MCP servers are launched by clients like Claude Code / Claude Desktop.
 
-Each tool auto-discovers `.oneleak.yaml` from the server process's working
+Each tool auto-discovers `.oneleaks.yaml` from the server process's working
 directory, matching the CLI's behavior: an MCP server is inherently invoked
 with a project directory as context, so there's no reason to make an agent
 pass config explicitly on every call.
@@ -16,14 +16,14 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from oneleak.config import discover_config
-from oneleak.models import Finding, MappingEntry, severity_rank
-from oneleak.sanitizer import desanitize as _desanitize
-from oneleak.sanitizer import sanitize as _sanitize
-from oneleak.scanner import finding_to_dict
-from oneleak.scanner import scan as _scan
+from oneleaks.config import discover_config
+from oneleaks.models import Finding, MappingEntry, severity_rank
+from oneleaks.sanitizer import desanitize as _desanitize
+from oneleaks.sanitizer import sanitize as _sanitize
+from oneleaks.scanner import finding_to_dict
+from oneleaks.scanner import scan as _scan
 
-mcp = FastMCP("oneleak")
+mcp = FastMCP("oneleaks")
 
 
 def _scan_payload(findings: list[Finding]) -> dict:
@@ -38,7 +38,7 @@ def _scan_payload(findings: list[Finding]) -> dict:
 @mcp.tool()
 def scan_text(content: str) -> dict:
     """Scan text for secrets and PII. Returns {safe, risk, findings}, the
-    same shape as `oneleak scan --json`.
+    same shape as `oneleaks scan --json`.
     """
     result = _scan(content, config=discover_config())
     return _scan_payload(result.findings)
@@ -47,7 +47,7 @@ def scan_text(content: str) -> dict:
 @mcp.tool()
 def scan_path(path: str) -> dict:
     """Scan a file or directory for secrets and PII. Returns {safe, risk,
-    findings}, the same shape as `oneleak scan <path> --json`.
+    findings}, the same shape as `oneleaks scan <path> --json`.
     """
     result = _scan(Path(path), config=discover_config())
     return _scan_payload(result.findings)

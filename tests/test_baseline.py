@@ -3,14 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from oneleak.baseline import (
+from oneleaks.baseline import (
     filter_new,
     load_baseline,
     require_stable_fingerprint_key,
     write_baseline,
 )
-from oneleak.errors import ConfigError
-from oneleak.models import Finding
+from oneleaks.errors import ConfigError
+from oneleaks.models import Finding
 
 
 def _finding(rule_id="generic-secret", path="app.py", fingerprint="sec_abc123") -> Finding:
@@ -110,10 +110,10 @@ class TestFilterNew:
 
 class TestRequireStableFingerprintKey:
     def test_raises_when_env_var_unset(self, monkeypatch):
-        monkeypatch.delenv("ONELEAK_FINGERPRINT_KEY", raising=False)
-        with pytest.raises(ConfigError, match="ONELEAK_FINGERPRINT_KEY"):
+        monkeypatch.delenv("ONELEAKS_FINGERPRINT_KEY", raising=False)
+        with pytest.raises(ConfigError, match="ONELEAKS_FINGERPRINT_KEY"):
             require_stable_fingerprint_key()
 
     def test_passes_when_env_var_set(self, monkeypatch):
-        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "a-stable-test-key")
+        monkeypatch.setenv("ONELEAKS_FINGERPRINT_KEY", "a-stable-test-key")
         require_stable_fingerprint_key()  # must not raise

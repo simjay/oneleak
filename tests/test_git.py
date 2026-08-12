@@ -2,8 +2,8 @@ import subprocess
 
 import pytest
 
-from oneleak import git
-from oneleak.config import Config
+from oneleaks import git
+from oneleaks.config import Config
 
 
 def _init_repo(path):

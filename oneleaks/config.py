@@ -1,4 +1,4 @@
-"""`.oneleak.yaml` loading. Unknown top-level fields are a hard error."""
+"""`.oneleaks.yaml` loading. Unknown top-level fields are a hard error."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from pathlib import Path
 
 import yaml
 
-from oneleak.errors import ConfigError, read_text_file, yaml_error_detail
-from oneleak.models import Severity
-from oneleak.pii_rules import known_types as known_pii_types
+from oneleaks.errors import ConfigError, read_text_file, yaml_error_detail
+from oneleaks.models import Severity
+from oneleaks.pii_rules import known_types as known_pii_types
 
 _KNOWN_TOP_LEVEL_KEYS = {
     "version",
@@ -26,7 +26,7 @@ _KNOWN_SEVERITIES = {s.value for s in Severity}
 
 @dataclass
 class Config:
-    """Parsed `.oneleak.yaml`, or construct one directly to pass to
+    """Parsed `.oneleaks.yaml`, or construct one directly to pass to
     `scan(config=...)` without a YAML file. `allow_paths` here corresponds to
     the YAML's nested `allow: {paths: [...]}`, flattened for convenience.
     """
@@ -125,11 +125,11 @@ def load_config(path: str | Path) -> Config:
     return parse_config(text, source=str(path))
 
 
-DEFAULT_CONFIG_FILENAME = ".oneleak.yaml"
+DEFAULT_CONFIG_FILENAME = ".oneleaks.yaml"
 
 
 def discover_config(start: Path | None = None) -> Config | None:
-    """Look for `.oneleak.yaml` in `start` (default: cwd). Used by the CLI only.
+    """Look for `.oneleaks.yaml` in `start` (default: cwd). Used by the CLI only.
     The Python API never auto-loads config, to keep library calls side-effect-free.
     """
     base = start or Path.cwd()

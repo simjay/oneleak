@@ -1,4 +1,4 @@
-# Contributing to oneleak
+# Contributing to oneleaks
 
 ## Setup
 
@@ -16,11 +16,11 @@ make test     # pytest, with coverage
 make ci       # lint + test + docs-build (what CI runs)
 ```
 
-`make ci` must pass before opening a PR. `pre-commit` runs a subset of the same checks automatically on `git commit`, including `oneleak scan --staged` on the repo's own changes.
+`make ci` must pass before opening a PR. `pre-commit` runs a subset of the same checks automatically on `git commit`, including `oneleaks scan --staged` on the repo's own changes.
 
 ## Adding a built-in rule
 
-Built-in secret rules live in `oneleak/builtin_rules/secrets.yaml`, PII rules in `oneleak/builtin_rules/pii.yaml`. See [Custom Rules](docs/rules.md) for the schema.
+Built-in secret rules live in `oneleaks/builtin_rules/secrets.yaml`, PII rules in `oneleaks/builtin_rules/pii.yaml`. See [Custom Rules](docs/rules.md) for the schema.
 
 Every new rule needs:
 

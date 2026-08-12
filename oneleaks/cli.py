@@ -1,4 +1,4 @@
-"""Command-line interface: `oneleak scan`, `oneleak sanitize`, `oneleak desanitize`."""
+"""Command-line interface: `oneleaks scan`, `oneleaks sanitize`, `oneleaks desanitize`."""
 
 from __future__ import annotations
 
@@ -8,18 +8,18 @@ import os
 import sys
 from pathlib import Path
 
-from oneleak import __version__, git
-from oneleak.baseline import (
+from oneleaks import __version__, git
+from oneleaks.baseline import (
     filter_new,
     load_baseline,
     require_stable_fingerprint_key,
     write_baseline,
 )
-from oneleak.config import discover_config
-from oneleak.errors import ConfigError, OneleakError, read_text_file
-from oneleak.models import Finding, MappingEntry, Severity, severity_rank
-from oneleak.sanitizer import desanitize, sanitize
-from oneleak.scanner import finding_to_dict, scan
+from oneleaks.config import discover_config
+from oneleaks.errors import ConfigError, OneleaksError, read_text_file
+from oneleaks.models import Finding, MappingEntry, Severity, severity_rank
+from oneleaks.sanitizer import desanitize, sanitize
+from oneleaks.scanner import finding_to_dict, scan
 
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
@@ -186,14 +186,14 @@ def cmd_desanitize(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="oneleak",
+        prog="oneleaks",
         description=(
             "Scan for and redact secrets and PII. Scans text, files, directories, "
             "or git content (working tree, index, or commit history); redacts with "
             "typed placeholders that can optionally be reversed."
         ),
     )
-    parser.add_argument("--version", action="version", version=f"oneleak {__version__}")
+    parser.add_argument("--version", action="version", version=f"oneleaks {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     scan_p = subparsers.add_parser("scan", help="Scan text/files/directories for sensitive data")
@@ -227,7 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Only findings at or above this severity affect the exit code",
     )
-    scan_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")
+    scan_p.add_argument("--config", default=None, help="Path to .oneleaks.yaml")
     scan_p.add_argument(
         "--baseline",
         default=None,
@@ -245,11 +245,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sanitize_p.add_argument("path", help="File to sanitize, or '-' for stdin")
     sanitize_p.add_argument("--map", default=None, help="Write a placeholder->value mapping file")
-    sanitize_p.add_argument("--config", default=None, help="Path to .oneleak.yaml")
+    sanitize_p.add_argument("--config", default=None, help="Path to .oneleaks.yaml")
     sanitize_p.set_defaults(func=cmd_sanitize)
 
     desanitize_p = subparsers.add_parser(
-        "desanitize", help="Restore values redacted by `oneleak sanitize --map`"
+        "desanitize", help="Restore values redacted by `oneleaks sanitize --map`"
     )
     desanitize_p.add_argument("path", help="Sanitized file to restore, or '-' for stdin")
     desanitize_p.add_argument(
@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except OneleakError as exc:
+    except OneleaksError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR
     except Exception as exc:  # CLI top-level guard, never dump content

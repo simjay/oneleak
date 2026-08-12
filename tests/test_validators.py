@@ -1,4 +1,4 @@
-from oneleak import validators
+from oneleaks import validators
 
 
 class TestLuhn:

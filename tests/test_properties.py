@@ -1,4 +1,4 @@
-"""Hypothesis property tests for the parts of oneleak with clean invariants:
+"""Hypothesis property tests for the parts of oneleaks with clean invariants:
 Luhn/IBAN checksum construction, sanitization offset math, overlap
 resolution, and config-schema validation.
 """
@@ -13,12 +13,12 @@ import yaml
 from hypothesis import given
 from hypothesis import strategies as st
 
-from oneleak.config import _KNOWN_TOP_LEVEL_KEYS, parse_config
-from oneleak.errors import ConfigError
-from oneleak.models import Finding, Rule
-from oneleak.sanitizer import sanitize_text
-from oneleak.scanner import _Candidate, _resolve_overlaps
-from oneleak.validators import iban, luhn
+from oneleaks.config import _KNOWN_TOP_LEVEL_KEYS, parse_config
+from oneleaks.errors import ConfigError
+from oneleaks.models import Finding, Rule
+from oneleaks.sanitizer import sanitize_text
+from oneleaks.scanner import _Candidate, _resolve_overlaps
+from oneleaks.validators import iban, luhn
 
 # --- Luhn -----------------------------------------------------------------------------------
 

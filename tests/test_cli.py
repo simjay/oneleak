@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from oneleak.cli import main
+from oneleaks.cli import main
 
 
 class _FakeStdin:
@@ -132,7 +132,7 @@ class TestHistoryCommand:
     ):
         repo = self._repo_with_removed_secret(tmp_path)
         # cmd_scan doesn't pass an explicit cwd to git.scan_history(), so it
-        # falls back to the process's actual cwd, same as running `oneleak
+        # falls back to the process's actual cwd, same as running `oneleaks
         # scan --history` from within the repo on a real shell.
         monkeypatch.chdir(repo)
 
@@ -251,26 +251,26 @@ class TestErrorMessagesFromPythonAPI:
     """
 
     def test_missing_config_raises_config_error(self, tmp_path: Path):
-        import oneleak
+        import oneleaks
 
-        with pytest.raises(oneleak.ConfigError) as exc_info:
-            oneleak.scan("x", config=str(tmp_path / "nope.yaml"))
+        with pytest.raises(oneleaks.ConfigError) as exc_info:
+            oneleaks.scan("x", config=str(tmp_path / "nope.yaml"))
         assert "not found" in str(exc_info.value)
 
     def test_missing_rule_file_raises_config_error(self, tmp_path: Path):
-        import oneleak
+        import oneleaks
 
-        with pytest.raises(oneleak.ConfigError) as exc_info:
-            oneleak.scan("x", rules=[str(tmp_path / "nope.yaml")])
+        with pytest.raises(oneleaks.ConfigError) as exc_info:
+            oneleaks.scan("x", rules=[str(tmp_path / "nope.yaml")])
         assert "not found" in str(exc_info.value)
 
     def test_malformed_rule_file_raises_config_error(self, tmp_path: Path):
-        import oneleak
+        import oneleaks
 
         bad = tmp_path / "bad.yaml"
         bad.write_text("rules: [unclosed\n")
-        with pytest.raises(oneleak.ConfigError) as exc_info:
-            oneleak.scan("x", rules=[str(bad)])
+        with pytest.raises(oneleaks.ConfigError) as exc_info:
+            oneleaks.scan("x", rules=[str(bad)])
         assert "invalid YAML" in str(exc_info.value)
 
 
@@ -278,23 +278,23 @@ class TestVersionFlag:
     def test_version_matches_package_metadata(self, capsys):
         from importlib.metadata import version
 
-        import oneleak
+        import oneleaks
 
         with pytest.raises(SystemExit) as exc_info:
             main(["--version"])
         assert exc_info.value.code == 0
         out = capsys.readouterr().out
-        assert oneleak.__version__ in out
-        # pyproject declares the version dynamically from oneleak/__init__.py.
+        assert oneleaks.__version__ in out
+        # pyproject declares the version dynamically from oneleaks/__init__.py.
         # This pins that the two can never drift apart.
-        assert version("oneleak") == oneleak.__version__
+        assert version("oneleaks") == oneleaks.__version__
 
 
 class TestBaselineFlag:
     _SECRET_TEXT = "OPENAI_API_KEY=sk-proj-" + "a" * 20 + "\n"
 
     def test_baseline_requires_stable_fingerprint_key(self, tmp_path: Path, monkeypatch, capsys):
-        monkeypatch.delenv("ONELEAK_FINGERPRINT_KEY", raising=False)
+        monkeypatch.delenv("ONELEAKS_FINGERPRINT_KEY", raising=False)
         baseline = tmp_path / "baseline.json"
         code, out = run_cli(
             ["scan", "-", "--baseline", str(baseline)],
@@ -303,7 +303,7 @@ class TestBaselineFlag:
             capsys=capsys,
         )
         assert code == 2
-        assert "ONELEAK_FINGERPRINT_KEY" in out.err
+        assert "ONELEAKS_FINGERPRINT_KEY" in out.err
 
     def test_update_baseline_without_baseline_flag_is_an_error(self, monkeypatch, capsys):
         code, out = run_cli(
@@ -318,7 +318,7 @@ class TestBaselineFlag:
     def test_update_baseline_then_rescan_reports_no_new_findings(
         self, tmp_path: Path, monkeypatch, capsys
     ):
-        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        monkeypatch.setenv("ONELEAKS_FINGERPRINT_KEY", "test-stable-key")
         baseline = tmp_path / "baseline.json"
 
         code, out = run_cli(
@@ -341,7 +341,7 @@ class TestBaselineFlag:
         assert "No findings" in out.out
 
     def test_new_finding_not_in_baseline_still_reported(self, tmp_path: Path, monkeypatch, capsys):
-        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        monkeypatch.setenv("ONELEAKS_FINGERPRINT_KEY", "test-stable-key")
         baseline = tmp_path / "baseline.json"
         baseline.write_text('{"version": 1, "findings": []}', encoding="utf-8")
 
@@ -355,7 +355,7 @@ class TestBaselineFlag:
         assert "openai-api-key" in out.out
 
     def test_baseline_shrinks_when_secret_is_removed(self, tmp_path: Path, monkeypatch, capsys):
-        monkeypatch.setenv("ONELEAK_FINGERPRINT_KEY", "test-stable-key")
+        monkeypatch.setenv("ONELEAKS_FINGERPRINT_KEY", "test-stable-key")
         baseline = tmp_path / "baseline.json"
 
         run_cli(

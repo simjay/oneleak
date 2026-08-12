@@ -1,4 +1,4 @@
-from oneleak.detectors import (
+from oneleaks.detectors import (
     entropy_candidates,
     generic_assignment_candidates,
     shannon_entropy,

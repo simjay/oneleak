@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-from oneleak.models import Finding, MappingEntry, SanitizedResult
-from oneleak.scanner import (
+from oneleaks.models import Finding, MappingEntry, SanitizedResult
+from oneleaks.scanner import (
     build_registry,
     resolve_config,
     resolve_text_input,

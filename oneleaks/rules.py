@@ -8,8 +8,8 @@ from pathlib import Path
 
 import yaml
 
-from oneleak.errors import ConfigError, read_text_file, yaml_error_detail
-from oneleak.models import Category, PythonRule, Rule, Severity
+from oneleaks.errors import ConfigError, read_text_file, yaml_error_detail
+from oneleaks.models import Category, PythonRule, Rule, Severity
 
 _REQUIRED_FIELDS = ("id", "category", "type", "severity")
 
@@ -153,7 +153,7 @@ class RuleRegistry:
     def load_builtin(self) -> None:
         # Local import: secret_rules.py/pii_rules.py import parse_yaml_rules
         # from this module, so importing them at module level here would cycle.
-        from oneleak import pii_rules, secret_rules
+        from oneleaks import pii_rules, secret_rules
 
         for source, entries in (
             (f"builtin:{secret_rules.BUILTIN_FILENAME}", secret_rules.builtin_entries()),

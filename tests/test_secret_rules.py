@@ -1,4 +1,4 @@
-from oneleak import secret_rules
+from oneleaks import secret_rules
 
 
 class TestBuiltinEntries:

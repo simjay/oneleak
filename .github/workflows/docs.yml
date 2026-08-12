@@ -56,4 +56,4 @@ jobs:
           fi
           curl -fsS -X POST \
             -H "Authorization: Token $RTD_API_TOKEN" \
-            "https://readthedocs.org/api/v3/projects/$RTD_PROJECT_SLUG/versions/latest/builds/"
+            "https://readthedocs.org/api/v3/projects/$RTD_PROJECT_SLUG/versions/latest/builds/"  # oneleaks: allow high-entropy-string

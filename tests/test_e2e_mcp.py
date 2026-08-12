@@ -1,13 +1,13 @@
-"""Real end-to-end test of the MCP server: spawns `oneleak-mcp` as an actual
+"""Real end-to-end test of the MCP server: spawns `oneleaks-mcp` as an actual
 subprocess and talks to it over real stdio using the `mcp` SDK's own client
 transport, the same way a real MCP client (Claude Code, Claude Desktop)
 would.
 
 tests/test_mcp_server.py deliberately tests the tool functions directly, not
 over a real transport, since protocol framing correctness is the `mcp` SDK's
-responsibility, not oneleak's. This file exists for the gap that leaves:
+responsibility, not oneleaks's. This file exists for the gap that leaves:
 does the server actually start, register its tools, and respond correctly
-when a real client connects, end to end? That's oneleak's responsibility
+when a real client connects, end to end? That's oneleaks's responsibility
 (entry point, FastMCP registration, our tool functions) even though the
 wire format isn't.
 
@@ -28,7 +28,7 @@ pytest.importorskip("mcp")
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-SERVER_PARAMS = StdioServerParameters(command=sys.executable, args=["-m", "oneleak.mcp_server"])
+SERVER_PARAMS = StdioServerParameters(command=sys.executable, args=["-m", "oneleaks.mcp_server"])
 
 
 async def _call_tool(name: str, arguments: dict) -> dict:

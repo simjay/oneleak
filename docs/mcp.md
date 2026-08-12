@@ -1,25 +1,25 @@
 # MCP Server
 
-oneleak ships an [MCP](https://modelcontextprotocol.io/) server so an agent runtime can call `scan`/`sanitize`/`desanitize` directly as tools, instead of shelling out to the CLI. This is the most direct way to plug oneleak into the "sanitize tool output before it reaches LLM context" workflow described in [Sanitization](sanitization.md).
+oneleaks ships an [MCP](https://modelcontextprotocol.io/) server so an agent runtime can call `scan`/`sanitize`/`desanitize` directly as tools, instead of shelling out to the CLI. This is the most direct way to plug oneleaks into the "sanitize tool output before it reaches LLM context" workflow described in [Sanitization](sanitization.md).
 
 ## Install
 
 ```bash
-pip install "oneleak[mcp]"
+pip install "oneleaks[mcp]"
 ```
 
-This pulls in the official MCP Python SDK (`mcp`), pinned below its still-in-beta 2.0 line. It's a separate extra, not a core dependency, so the base `oneleak` package stays dependency-light.
+This pulls in the official MCP Python SDK (`mcp`), pinned below its still-in-beta 2.0 line. It's a separate extra, not a core dependency, so the base `oneleaks` package stays dependency-light.
 
 ## Run
 
 ```bash
-oneleak-mcp
+oneleaks-mcp
 ```
 
 or
 
 ```bash
-python -m oneleak.mcp_server
+python -m oneleaks.mcp_server
 ```
 
 The server uses stdio transport (standard input/output), the way local MCP servers are normally launched by a client, not something you run standalone and connect to over a network.
@@ -31,20 +31,20 @@ Example for Claude Desktop / Claude Code style MCP config (`claude_desktop_confi
 ```json
 {
   "mcpServers": {
-    "oneleak": {
-      "command": "oneleak-mcp"
+    "oneleaks": {
+      "command": "oneleaks-mcp"
     }
   }
 }
 ```
 
-The server auto-discovers `.oneleak.yaml` from its working directory, the same way the CLI does. Point the client's working directory at your project root if you want project-specific config (excluded paths, disabled rules, severity overrides, etc.) to apply.
+The server auto-discovers `.oneleaks.yaml` from its working directory, the same way the CLI does. Point the client's working directory at your project root if you want project-specific config (excluded paths, disabled rules, severity overrides, etc.) to apply.
 
 ## Tools
 
 ### `scan_text(content: str) -> dict`
 
-Scan a string for secrets and PII. Returns the same shape as `oneleak scan --json`:
+Scan a string for secrets and PII. Returns the same shape as `oneleaks scan --json`:
 
 ```json
 {"safe": false, "risk": "critical", "findings": [...]}
@@ -52,7 +52,7 @@ Scan a string for secrets and PII. Returns the same shape as `oneleak scan --jso
 
 ### `scan_path(path: str) -> dict`
 
-Same as `scan_text`, but for a file or directory path. Mirrors `oneleak scan <path>`.
+Same as `scan_text`, but for a file or directory path. Mirrors `oneleaks scan <path>`.
 
 ### `sanitize_text(content: str, reveal: bool = False) -> dict`
 

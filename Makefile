@@ -1,4 +1,4 @@
-PY := oneleak tests scripts
+PY := oneleaks tests scripts
 
 # mkdocs-material prints an unconditional multi-line advocacy notice about
 # MkDocs 2.0 on every invocation (see material/templates/__init__.py: it
@@ -22,10 +22,10 @@ format:
 lint:
 	uv run ruff check $(PY)
 	uv run ruff format --check $(PY)
-	uv run mypy oneleak
+	uv run mypy oneleaks
 
 test:
-	uv run pytest --cov=oneleak --cov-report=term-missing
+	uv run pytest --cov=oneleaks --cov-report=term-missing
 
 bench:
 	uv run python scripts/benchmark.py

@@ -11,9 +11,9 @@ import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from oneleak.errors import ScanError
-from oneleak.models import ScanResult
-from oneleak.scanner import (
+from oneleaks.errors import ScanError
+from oneleaks.models import ScanResult
+from oneleaks.scanner import (
     _is_probably_binary,
     build_registry,
     resolve_config,
@@ -39,7 +39,7 @@ def _run_git(args: list[str], cwd: str | None = None) -> str:
 
 def _git_failure_message(stderr: str) -> str:
     """Turn git's stderr into a message for the user, without echoing back the
-    internal command oneleak happened to run (`git log --format=%H,%P ...` is
+    internal command oneleaks happened to run (`git log --format=%H,%P ...` is
     an implementation detail, and "not a git repository" is the actual problem).
 
     Truncated: some git failures (e.g. an unrecognized option) respond with
@@ -268,7 +268,7 @@ def scan_history(
     all_refs: bool = False,
 ) -> ScanResult:
     """Scans commit history for secrets, including ones later removed from
-    the working tree: what `oneleak scan .` / scan_changed() / scan_staged()
+    the working tree: what `oneleaks scan .` / scan_changed() / scan_staged()
     cannot see, since they only look at current content.
 
     Defaults to the current branch's history (not --all), capped at the most

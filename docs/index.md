@@ -1,6 +1,6 @@
-# oneleak
+# oneleaks
 
-oneleak is a lightweight, **pure-Python** sensitive-data scanner and sanitizer, designed to run anywhere Python runs: local development, pre-commit hooks, CI, and agent workflows.
+oneleaks is a lightweight, **pure-Python** sensitive-data scanner and sanitizer, designed to run anywhere Python runs: local development, pre-commit hooks, CI, and agent workflows.
 
 It provides one scanning engine for:
 
@@ -10,24 +10,24 @@ It provides one scanning engine for:
 
 Core detection is deterministic: no external binary, no network service, no ML model required.
 
-## Why oneleak
+## Why oneleaks
 
-- **Pure Python.** `pip install oneleak` and go: no Go binary, no Docker image.
-- **One scanner for secrets and PII.** Most tools pick one. oneleak does both in a single pass.
-- **Sanitization is first-class, not an afterthought.** `oneleak.sanitize()` redacts with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API_KEY_1>`), and can optionally export a reversible mapping.
-- **Agent-friendly.** Fast enough to invoke on every agent turn, with JSON output, stdin/stdout, and `oneleak.git.scan_changed()` for "what did the agent just touch."
+- **Pure Python.** `pip install oneleaks` and go: no Go binary, no Docker image.
+- **One scanner for secrets and PII.** Most tools pick one. oneleaks does both in a single pass.
+- **Sanitization is first-class, not an afterthought.** `oneleaks.sanitize()` redacts with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API_KEY_1>`), and can optionally export a reversible mapping.
+- **Agent-friendly.** Fast enough to invoke on every agent turn, with JSON output, stdin/stdout, and `oneleaks.git.scan_changed()` for "what did the agent just touch."
 
 ## Quick example
 
 ```python
-import oneleak
+import oneleaks
 
-result = oneleak.scan("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
+result = oneleaks.scan("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
 if not result.safe:
     for finding in result.findings:
         print(finding.rule_id, finding.severity, finding.preview)
 
-safe = oneleak.sanitize("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
+safe = oneleaks.sanitize("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
 print(safe.text)
 # OPENAI_API_KEY=<OPENAI_API_KEY_1>
 # email=<EMAIL_1>

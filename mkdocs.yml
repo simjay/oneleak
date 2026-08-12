@@ -1,8 +1,8 @@
-site_name: oneleak
+site_name: oneleaks
 site_description: A lightweight, pure-Python sensitive-data scanner and sanitizer
-site_url: https://oneleak.readthedocs.io/
-repo_url: https://github.com/simjay/oneleak
-repo_name: simjay/oneleak
+site_url: https://oneleaks.readthedocs.io/
+repo_url: https://github.com/simjay/oneleaks
+repo_name: simjay/oneleaks
 
 theme:
   name: material

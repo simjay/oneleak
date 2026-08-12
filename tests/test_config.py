@@ -1,7 +1,7 @@
 import pytest
 
-from oneleak.config import Config, discover_config, parse_config
-from oneleak.errors import ConfigError
+from oneleaks.config import Config, discover_config, parse_config
+from oneleaks.errors import ConfigError
 
 
 class TestParseConfig:
@@ -19,7 +19,7 @@ pii:
   email: true
   phone: false
 rule_paths:
-  - ".oneleak/rules/"
+  - ".oneleaks/rules/"
 allow:
   paths:
     - "tests/fixtures/**"
@@ -31,7 +31,7 @@ severity_overrides:
         cfg = parse_config(text)
         assert cfg.exclude == [".git/**", "node_modules/**"]
         assert cfg.pii == {"email": True, "phone": False}
-        assert cfg.rule_paths == [".oneleak/rules/"]
+        assert cfg.rule_paths == [".oneleaks/rules/"]
         assert cfg.allow_paths == ["tests/fixtures/**"]
         assert cfg.disabled_rules == ["some-rule"]
         assert cfg.severity_overrides == {"some-rule": "low"}
@@ -105,7 +105,7 @@ class TestDiscoverConfig:
         assert discover_config(tmp_path) is None
 
     def test_loads_when_present(self, tmp_path):
-        (tmp_path / ".oneleak.yaml").write_text("exclude:\n  - foo/**\n")
+        (tmp_path / ".oneleaks.yaml").write_text("exclude:\n  - foo/**\n")
         cfg = discover_config(tmp_path)
         assert cfg is not None
         assert cfg.exclude == ["foo/**"]

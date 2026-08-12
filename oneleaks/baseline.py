@@ -23,8 +23,8 @@ import json
 import os
 from pathlib import Path
 
-from oneleak.errors import ConfigError, read_text_file
-from oneleak.models import Finding
+from oneleaks.errors import ConfigError, read_text_file
+from oneleaks.models import Finding
 
 BASELINE_VERSION = 1
 
@@ -33,15 +33,15 @@ _Key = tuple[str, str | None, str | None]
 
 def require_stable_fingerprint_key() -> None:
     """Baselines match findings by fingerprint, and fingerprints are HMAC-keyed
-    off a random key generated fresh per process unless `ONELEAK_FINGERPRINT_KEY`
+    off a random key generated fresh per process unless `ONELEAKS_FINGERPRINT_KEY`
     is set. Without a stable key, a baseline could never match anything written
     by a previous run, so it would silently fail to do its one job. Fail loudly
     up front instead.
     """
-    if not os.environ.get("ONELEAK_FINGERPRINT_KEY"):
+    if not os.environ.get("ONELEAKS_FINGERPRINT_KEY"):
         raise ConfigError(
             "--baseline requires a stable fingerprint key: set the "
-            "ONELEAK_FINGERPRINT_KEY environment variable (same value on every "
+            "ONELEAKS_FINGERPRINT_KEY environment variable (same value on every "
             "machine/CI run that reads or writes this baseline). See "
             "docs/configuration.md#baselines."
         )

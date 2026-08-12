@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 
-from oneleak.models import Rule, RuleMatch
+from oneleaks.models import Rule, RuleMatch
 
 _CONTEXT_WINDOW = 60  # chars of look-back on the same line used for keyword gating
 

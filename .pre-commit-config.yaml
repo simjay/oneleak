@@ -15,15 +15,15 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: uv run mypy oneleak
+        entry: uv run mypy oneleaks
         language: system
         pass_filenames: false
         types: [python]
 
-      - id: oneleak-scan-staged
-        name: oneleak scan --staged
-        description: Dogfooding, oneleak scanning its own staged changes before commit
-        entry: uv run oneleak scan --staged --fail-on high
+      - id: oneleaks-scan-staged
+        name: oneleaks scan --staged
+        description: Dogfooding, oneleaks scanning its own staged changes before commit
+        entry: uv run oneleaks scan --staged --fail-on high
         language: system
         pass_filenames: false
         always_run: true

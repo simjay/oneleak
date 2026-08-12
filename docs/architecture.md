@@ -1,16 +1,16 @@
 # How Scanning & Sanitization Work
 
-This page explains the actual mechanism behind `scan()` and `sanitize()`: the pipeline stages, why they're ordered the way they are, and the specific bugs that ordering was chosen to avoid. If you just want to *use* oneleak, see [Quickstart](quickstart.md). This page is for understanding or extending its internals.
+This page explains the actual mechanism behind `scan()` and `sanitize()`: the pipeline stages, why they're ordered the way they are, and the specific bugs that ordering was chosen to avoid. If you just want to *use* oneleaks, see [Quickstart](quickstart.md). This page is for understanding or extending its internals.
 
 ## The detection pipeline
 
-Every scan (text, a file, a directory, a git diff hunk) goes through the same sequence, implemented in `oneleak/scanner.py::scan_text()`:
+Every scan (text, a file, a directory, a git diff hunk) goes through the same sequence, implemented in `oneleaks/scanner.py::scan_text()`:
 
 ```mermaid
 flowchart TD
     A[Input text] --> B[Candidate generation]
     B --> C[Disabled-rule filtering]
-    C --> D[Suppression<br/>#35; oneleak: allow]
+    C --> D[Suppression<br/>#35; oneleaks: allow]
     D --> E[Overlap resolution]
     E --> F[Finding construction<br/>preview + fingerprint]
     F --> G[Config filters<br/>severity_overrides, allow.paths]
@@ -23,7 +23,7 @@ flowchart TD
 
 - **Regex rules** (`detectors.py::regex_candidates()`): every built-in and custom declarative rule with a `pattern`. If the rule also has `keywords`, a match only counts if one of those keywords appears within ~60 characters before it on the same line (`_has_keyword_context()`). This is what lets a rule like `aws-secret-access-key` require both a specific 40-character shape *and* nearby context, instead of flagging every base64-looking string in a codebase.
 
-  **This is not a keyword-prefilter architecture.** Some scanners (Betterleaks, for instance) run a fast keyword search first and only run the slower regex against text that passed it, as a large-repo performance optimization. oneleak does the opposite order: every rule's regex always runs over the entire input first, and `keywords` (when present) is checked only against a window near an *already-found* regex match, purely to reduce false positives, never to skip work. No keyword search ever narrows what a regex sees, and there's no separate "did any keyword appear in this file at all" pass. Simpler and correctness-first, at the cost of always paying full regex cost regardless of keyword presence.
+  **This is not a keyword-prefilter architecture.** Some scanners (Betterleaks, for instance) run a fast keyword search first and only run the slower regex against text that passed it, as a large-repo performance optimization. oneleaks does the opposite order: every rule's regex always runs over the entire input first, and `keywords` (when present) is checked only against a window near an *already-found* regex match, purely to reduce false positives, never to skip work. No keyword search ever narrows what a regex sees, and there's no separate "did any keyword appear in this file at all" pass. Simpler and correctness-first, at the cost of always paying full regex cost regardless of keyword presence.
 - **Generic assignment detection** (`detectors.py::generic_assignment_candidates()`): a single regex over key names like `password`, `token`, `api_key`, matched against common assignment syntax (`key = "value"`, `key: value`, `KEY=value`). This is what catches secrets that don't match any specific provider's format.
 - **Entropy detection** (`detectors.py::entropy_candidates()`): scans for base64-alphabet runs (20-100 characters) and computes Shannon entropy on each. Deliberately excludes pure-hex runs (git hashes and checksums are indistinguishable from real secrets by entropy alone) and known-shape false positives like UUIDs. This is the lowest-confidence, lowest-priority signal. See [Overlap resolution](#4-overlap-resolution) below.
 - **Python rules**: any `PythonRule` instances passed via `rules=[...]`, called directly. Never auto-loaded from files. See [Custom Rules](rules.md).
@@ -32,14 +32,14 @@ Each regex match with a `validator` (`luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt
 
 ### 2. Disabled-rule filtering
 
-Rules turned off via `.oneleak.yaml`'s `disabled_rules` or `pii: {<type>: false}` are removed next (`_disabled_rule_ids()`). This happens before suppression and overlap resolution so a disabled rule never competes for a span in the first place.
+Rules turned off via `.oneleaks.yaml`'s `disabled_rules` or `pii: {<type>: false}` are removed next (`_disabled_rule_ids()`). This happens before suppression and overlap resolution so a disabled rule never competes for a span in the first place.
 
 ### 3. Suppression: *before* overlap resolution, deliberately
 
-Inline `# oneleak: allow` (optionally scoped to a rule ID) is applied next. This ordering is load-bearing, not incidental: suppression used to run *after* overlap resolution, and that was a real bug. Consider:
+Inline `# oneleaks: allow` (optionally scoped to a rule ID) is applied next. This ordering is load-bearing, not incidental: suppression used to run *after* overlap resolution, and that was a real bug. Consider:
 
 ```python
-api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleak: allow aws-access-key-id
+api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleaks: allow aws-access-key-id
 ```
 
 Two rules match this span: `aws-access-key-id` (priority 100) and the generic-assignment rule (priority 50). [Overlap resolution](#4-overlap-resolution) keeps only the higher-priority one. If suppression ran *after* that resolution, scoping the `allow` comment to `aws-access-key-id` would discard the only surviving candidate for that span: the generic-assignment rule that would have caught it independently was already gone, discarded during overlap resolution before suppression got a say. The result: a narrowly-scoped suppression silently suppressed *everything* on that line, not just the one rule.
@@ -66,11 +66,11 @@ Each surviving candidate becomes a `Finding`: line/column computed from the byte
 
 ### 6. Config filters
 
-Finally, `_apply_config_filters()` applies `severity_overrides` (swap a finding's severity per `.oneleak.yaml`) and `allow.paths` (drop findings under an allowed path entirely). This step, along with disabled-rule filtering, is applied through one shared function, `scan_text_with_config()`, used identically by `scan()`, `git.scan_changed()`/`scan_staged()`/`scan_history()`, and `sanitize()`. That's deliberate: earlier, each of those entry points independently reimplemented "apply the config," and each one launched with a slightly different bug (`git.py` and later `sanitize()` both shipped without `allow.paths`/`disabled_rules` support at various points before this was consolidated). One shared function means that class of bug can't reappear at a fourth call site.
+Finally, `_apply_config_filters()` applies `severity_overrides` (swap a finding's severity per `.oneleaks.yaml`) and `allow.paths` (drop findings under an allowed path entirely). This step, along with disabled-rule filtering, is applied through one shared function, `scan_text_with_config()`, used identically by `scan()`, `git.scan_changed()`/`scan_staged()`/`scan_history()`, and `sanitize()`. That's deliberate: earlier, each of those entry points independently reimplemented "apply the config," and each one launched with a slightly different bug (`git.py` and later `sanitize()` both shipped without `allow.paths`/`disabled_rules` support at various points before this was consolidated). One shared function means that class of bug can't reappear at a fourth call site.
 
 ## Fingerprinting
 
-A fingerprint identifies a value without storing it: `HMAC-SHA256(key, rule_id + ":" + normalized_value)`, truncated and prefixed by category (`sec_`, `pii_`, `sen_`, or `fnd_` for a custom Python rule's non-standard category). The key is, in order of preference: an explicit key passed by the caller, the `ONELEAK_FINGERPRINT_KEY` environment variable, or a random 32-byte key generated once per process and reused for that process's lifetime.
+A fingerprint identifies a value without storing it: `HMAC-SHA256(key, rule_id + ":" + normalized_value)`, truncated and prefixed by category (`sec_`, `pii_`, `sen_`, or `fnd_` for a custom Python rule's non-standard category). The key is, in order of preference: an explicit key passed by the caller, the `ONELEAKS_FINGERPRINT_KEY` environment variable, or a random 32-byte key generated once per process and reused for that process's lifetime.
 
 HMAC (not a plain hash) matters specifically for low-entropy values like SSNs. A plain `sha256(ssn)` is reversible by brute force (there are only ~10 billion possible SSNs, so an attacker can hash all of them once and build a lookup table). Mixing in a secret key defeats that, *provided the key itself never ends up alongside the fingerprints it produced*. See the warning in [Sanitization](sanitization.md#the-mapping-file-is-a-vault-not-a-log) about the equivalent risk for mapping files.
 
@@ -99,4 +99,4 @@ Each finding's line number is then translated from "line within the hunk" back t
 - [Sanitization](sanitization.md): the reversible-mapping workflow and how to use it safely from an agent
 - [Custom Rules](rules.md): the rule schema and priority tiers in more detail
 - [CLI Reference](cli.md#git-history-scanning): `--history` flags and defaults
-- `oneleak/scanner.py`, `oneleak/detectors.py`, `oneleak/sanitizer.py`, `oneleak/git.py`: the actual implementation. Every function named on this page lives in one of those four files
+- `oneleaks/scanner.py`, `oneleaks/detectors.py`, `oneleaks/sanitizer.py`, `oneleaks/git.py`: the actual implementation. Every function named on this page lives in one of those four files
