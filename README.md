@@ -1,8 +1,20 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mark-on-dark.svg">
+  <img src="docs/assets/mark-on-light.svg" alt="" width="56" height="56">
+</picture>
+
 # oneleaks
+
+[![PyPI](https://img.shields.io/pypi/v/oneleaks?style=flat-square)](https://pypi.org/project/oneleaks/)
+[![Python](https://img.shields.io/pypi/pyversions/oneleaks?style=flat-square)](https://pypi.org/project/oneleaks/)
+[![CI](https://img.shields.io/github/actions/workflow/status/simjay/oneleaks/ci.yml?branch=main&label=ci&style=flat-square)](https://github.com/simjay/oneleaks/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/readthedocs/oneleaks?style=flat-square)](https://oneleaks.readthedocs.io/)
+[![License](https://img.shields.io/pypi/l/oneleaks?style=flat-square)](LICENSE)
+[![Ruff](https://img.shields.io/badge/code_style-ruff-261230?style=flat-square)](https://github.com/astral-sh/ruff)
 
 oneleaks is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs: agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required (the one exception: `git` itself, used only by `oneleaks.git`).
 
-Full docs: **[oneleaks.readthedocs.io](https://oneleaks.readthedocs.io/)**. The [architecture](https://oneleaks.readthedocs.io/architecture/) page explains the detection pipeline and sanitization algorithm in detail.
+Full docs: **[oneleaks.readthedocs.io](https://oneleaks.readthedocs.io/)**. The [architecture](https://oneleaks.readthedocs.io/en/latest/architecture/) page explains the detection pipeline and sanitization algorithm in detail.
 
 ## Install
 
@@ -87,7 +99,7 @@ Exit codes: `0` clean, `1` findings detected, `2` execution/configuration error.
 oneleaks-mcp
 ```
 
-Exposes `scan_text`, `scan_path`, `sanitize_text`, `desanitize_text` as MCP tools over stdio, for agent runtimes to call directly. See [docs/mcp.md](https://oneleaks.readthedocs.io/mcp/).
+Exposes `scan_text`, `scan_path`, `sanitize_text`, `desanitize_text` as MCP tools over stdio, for agent runtimes to call directly. See [docs/mcp.md](https://oneleaks.readthedocs.io/en/latest/mcp/).
 
 ## Config
 

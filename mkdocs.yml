@@ -6,6 +6,11 @@ repo_name: simjay/oneleaks
 
 theme:
   name: material
+  # Rendered into an <img> and a <link rel="icon">, so each file carries an
+  # explicit fill rather than currentColor, which would resolve to black in
+  # those standalone contexts and disappear against the indigo header.
+  logo: assets/mark-on-dark.svg
+  favicon: assets/favicon.svg
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -38,6 +43,9 @@ plugins:
 
 markdown_extensions:
   - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.highlight
   - pymdownx.superfences:
       custom_fences:

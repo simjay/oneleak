@@ -1,6 +1,8 @@
 # MCP Server
 
-oneleaks ships an [MCP](https://modelcontextprotocol.io/) server so an agent runtime can call `scan`/`sanitize`/`desanitize` directly as tools, instead of shelling out to the CLI. This is the most direct way to plug oneleaks into the "sanitize tool output before it reaches LLM context" workflow described in [Sanitization](sanitization.md).
+oneleaks ships an [MCP](https://modelcontextprotocol.io/) server, so an agent runtime can call `scan`, `sanitize`, and `desanitize` directly as tools instead of shelling out to the CLI.
+
+It's the most direct way to run the "sanitize tool output before it reaches the model" workflow from [Sanitization](sanitization.md).
 
 ## Install
 
@@ -8,7 +10,9 @@ oneleaks ships an [MCP](https://modelcontextprotocol.io/) server so an agent run
 pip install "oneleaks[mcp]"
 ```
 
-This pulls in the official MCP Python SDK (`mcp`), pinned below its still-in-beta 2.0 line. It's a separate extra, not a core dependency, so the base `oneleaks` package stays dependency-light.
+This pulls in the official MCP Python SDK, pinned below its still-in-beta 2.0 line.
+
+It's a separate extra rather than a core dependency, so base `oneleaks` stays dependency-light.
 
 ## Run
 
@@ -38,7 +42,11 @@ Example for Claude Desktop / Claude Code style MCP config (`claude_desktop_confi
 }
 ```
 
-The server auto-discovers `.oneleaks.yaml` from its working directory, the same way the CLI does. Point the client's working directory at your project root if you want project-specific config (excluded paths, disabled rules, severity overrides, etc.) to apply.
+The server auto-discovers `.oneleaks.yaml` from its working directory, the same way the CLI does.
+
+!!! tip "Point the client's working directory at your project root"
+
+    Otherwise your project config — excluded paths, disabled rules, severity overrides — won't apply.
 
 ## Tools
 
@@ -62,7 +70,9 @@ Redacts secrets/PII with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API
 {"text": "email=<EMAIL_1>", "mapping": null}
 ```
 
-With `reveal=True`, `mapping` is populated (`{placeholder: {value, rule_id, fingerprint}}`) so the sanitized text can be reversed later via `desanitize_text`. Treat that mapping exactly as sensitively as the original content: it contains raw values.
+With `reveal=True`, `mapping` is populated as `{placeholder: {value, rule_id, fingerprint}}`, so the text can be reversed later with `desanitize_text`.
+
+That mapping contains raw values. Treat it exactly as sensitively as the original content.
 
 ### `desanitize_text(text: str, mapping: dict) -> dict`
 
@@ -74,7 +84,7 @@ Reverses `sanitize_text(..., reveal=True)`:
 
 ## The agent pattern this enables
 
-An agent can work entirely on sanitized text (the model itself never sees a raw secret) and rehydrate the real value only at the point of actually performing an action:
+An agent works entirely on sanitized text, so the model never sees a raw secret. The real value comes back only at the moment an action needs it:
 
 ```text
 tool output
@@ -86,4 +96,4 @@ agent works on sanitized text, decides on an action
 desanitize_text right before the action actually needs the real value
 ```
 
-See [Sanitization](sanitization.md) for more on why this is reversible tokenization, not one-way redaction, and what that implies about protecting the mapping.
+See [Sanitization](sanitization.md) for why this is reversible tokenization rather than one-way redaction, and what that means for protecting the mapping.

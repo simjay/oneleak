@@ -1,23 +1,8 @@
 # oneleaks
 
-oneleaks is a lightweight, **pure-Python** sensitive-data scanner and sanitizer, designed to run anywhere Python runs: local development, pre-commit hooks, CI, and agent workflows.
+A lightweight, **pure-Python** scanner and sanitizer for secrets and PII.
 
-It provides one scanning engine for:
-
-- **Secrets and credentials**: provider-specific API keys, generic credential assignments, high-entropy tokens, private keys, JWTs, connection strings
-- **PII**: email, phone, SSN, credit card, IPv4/IPv6, IBAN
-- **Custom sensitive information**: your own YAML, JSON, or Python rules
-
-Core detection is deterministic: no external binary, no network service, no ML model required.
-
-## Why oneleaks
-
-- **Pure Python.** `pip install oneleaks` and go: no Go binary, no Docker image.
-- **One scanner for secrets and PII.** Most tools pick one. oneleaks does both in a single pass.
-- **Sanitization is first-class, not an afterthought.** `oneleaks.sanitize()` redacts with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API_KEY_1>`), and can optionally export a reversible mapping.
-- **Agent-friendly.** Fast enough to invoke on every agent turn, with JSON output, stdin/stdout, and `oneleaks.git.scan_changed()` for "what did the agent just touch."
-
-## Quick example
+It runs anywhere Python runs: local development, pre-commit hooks, CI, and agent workflows.
 
 ```python
 import oneleaks
@@ -33,12 +18,42 @@ print(safe.text)
 # email=<EMAIL_1>
 ```
 
-See [Quickstart](quickstart.md) to get started, or the [CLI Reference](cli.md) for command-line usage.
+## What it finds
 
-## Documentation
+| Category | Examples |
+|---|---|
+| **Secrets** | Provider API keys, generic credential assignments, high-entropy tokens, private keys, JWTs, connection strings |
+| **PII** | Email, phone, SSN, credit card, IPv4/IPv6, IBAN, IMEI, MAC address, routing numbers |
+| **Your own** | Custom YAML, JSON, or Python rules |
 
-- **[Getting Started](quickstart.md)**: install, first scan, first sanitize
-- **[Guides](cli.md)**: CLI reference, custom rules, sanitization, the MCP server
-- **[Advanced: How Scanning & Sanitization Work](architecture.md)**: the detection pipeline stage by stage, why suppression runs before overlap resolution, the sanitization algorithm, and how git history scanning avoids breaking multi-line secrets
-- **[Advanced: Concepts](concepts.md)**: the field knowledge behind the design, entropy, validators, fingerprinting, baselines, and why some competitor techniques were evaluated and not adopted
-- **[API Reference](api.md)**: generated from docstrings
+Detection is deterministic. No external binary, no network service, no ML model.
+
+## Why oneleaks
+
+**Pure Python.** `pip install oneleaks` and go. No Go binary, no Docker image.
+
+**One scanner for secrets *and* PII.** Most tools pick one. oneleaks does both in a single pass.
+
+**Sanitization is first-class.** `sanitize()` replaces values with typed, numbered placeholders like `<EMAIL_1>`, and can optionally export a reversible mapping.
+
+**Agent-friendly.** Fast enough to run on every agent turn, with JSON output, stdin/stdout piping, and `git.scan_changed()` for "what did the agent just touch?"
+
+## Where to go next
+
+**Start here**
+
+- [Quickstart](quickstart.md) — install, first scan, first sanitize
+- [Configuration](configuration.md) — `.oneleaks.yaml`, and adopting oneleaks on an existing codebase
+
+**Using it**
+
+- [CLI Reference](cli.md) — every command and flag
+- [Custom Rules](rules.md) — add your own patterns
+- [Sanitization](sanitization.md) — the reversible-mapping workflow
+- [MCP Server](mcp.md) — expose oneleaks to agent runtimes
+
+**Understanding it**
+
+- [How Scanning & Sanitization Work](architecture.md) — the pipeline, stage by stage
+- [Concepts](concepts.md) — entropy, validators, fingerprinting, and the reasoning behind the design
+- [API Reference](api.md) — generated from docstrings

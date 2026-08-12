@@ -1,11 +1,13 @@
 # Sanitization
 
-`oneleaks.sanitize()` reuses `scan()`'s findings. There is no second detection system to keep in sync.
+`sanitize()` reuses `scan()`'s findings. There's no second detection system to keep in sync.
 
 ## Typed, numbered placeholders
 
 ```python
-result = oneleaks.sanitize("Email alice@example.com using key sk-proj-xxxx. Contact alice@example.com again.")
+result = oneleaks.sanitize(
+    "Email alice@example.com using key sk-proj-xxxx. Contact alice@example.com again."
+)
 print(result.text)
 ```
 
@@ -13,51 +15,61 @@ print(result.text)
 Email <EMAIL_1> using key <OPENAI_API_KEY_1>. Contact <EMAIL_1> again.
 ```
 
-Repeated values reuse the same placeholder *within one call* (referential consistency). Distinct values of the same type get distinct numbers (`<EMAIL_1>`, `<EMAIL_2>`, ...).
+Two things are happening:
+
+- **Repeated values reuse one placeholder.** Both mentions of `alice@example.com` become `<EMAIL_1>`, so the text still reads coherently.
+- **Distinct values get distinct numbers.** A second address would be `<EMAIL_2>`.
 
 ## Reversible sanitization
 
-By default `sanitize()` stays safe: no raw values are retrievable from the result. Pass `reveal=True` to opt into a mapping:
+By default nothing raw survives in the result. Pass `reveal=True` to opt into a mapping:
 
 ```python
 result = oneleaks.sanitize(text, reveal=True)
 
 result.mapping
-# {"<EMAIL_1>": MappingEntry(value="alice@example.com", rule_id="email", fingerprint="pii_..."), ...}
+# {"<EMAIL_1>": MappingEntry(value="alice@example.com", rule_id="email", ...)}
 
 restored = oneleaks.desanitize(result.text, result.mapping)
 assert restored == text
 ```
 
-`result.mapping` stays `None` unless you explicitly ask for it. This is the one deliberate exception to "no raw values by default," and it exists specifically to support the agent pattern below.
+`result.mapping` stays `None` unless you ask for it. This is the one deliberate exception to "no raw values by default," and it exists for the agent pattern below.
 
 ### Why reversibility matters for agents
 
-An agent can work entirely on sanitized text (the LLM itself never sees a real secret) and rehydrate the real value only at the point of actually performing an action:
+An agent can work entirely on sanitized text — the model never sees a real secret — and rehydrate only at the moment of acting:
 
 ```python
 safe = oneleaks.sanitize(tool_output, reveal=True)
-agent.add_context(safe.text)          # LLM only ever sees placeholders
+agent.add_context(safe.text)                                  # model sees placeholders only
 ...
 real = oneleaks.desanitize(agent_decision_text, safe.mapping)  # rehydrate right before use
 ```
 
-### Continuing numbering across multiple calls
+### Consistency across multiple calls
 
-For an agent making many tool calls in one session, `seed_mapping` keeps placeholder numbering and reuse consistent across calls, not just within one:
+For an agent making many tool calls in one session, `seed_mapping` carries numbering and reuse across calls:
 
 ```python
 r1 = oneleaks.sanitize(tool_output_1, reveal=True)
 r2 = oneleaks.sanitize(tool_output_2, reveal=True, seed_mapping=r1.mapping)
-# a value repeated between tool_output_1 and tool_output_2 reuses the same placeholder
 ```
+
+A value appearing in both outputs now reuses the same placeholder.
 
 ## The mapping file is a vault, not a log
 
-If you export a mapping to disk (`oneleaks sanitize --map mapping.json` on the CLI), treat it exactly as sensitively as the original content: it's tokenization (reversible), not redaction (one-way). The CLI writes it with `0600` permissions and a stderr warning. **Never commit it**.
+!!! danger "Treat an exported mapping exactly like the original secrets"
+
+    Writing a mapping to disk with `oneleaks sanitize --map mapping.json` produces **tokenization**, not redaction. It is reversible by design.
+
+    A leaked mapping file is as bad as a leaked secret, because it undoes the whole protection.
+
+    The CLI writes it with `0600` permissions and a stderr warning. **Never commit it.**
 
 ## Algorithm notes
 
-- Findings are replaced right-to-left (by descending start offset) so earlier replacements don't invalidate later offsets.
-- Overlapping findings are resolved *before* replacement. See [how rule priority resolves overlaps](architecture.md#4-overlap-resolution) in How Scanning & Sanitization Work.
-- `desanitize()` does a plain per-placeholder string replace. Placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left untouched rather than raising.
+- Replacements run **right to left**, by descending start offset, so earlier replacements don't invalidate later offsets.
+- Overlapping findings are resolved *before* replacement. See [overlap resolution](architecture.md#4-overlap-resolution).
+- `desanitize()` is a plain per-placeholder string replace. Placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left alone rather than raising — sanitized text often round-trips through a model that won't echo every placeholder verbatim.

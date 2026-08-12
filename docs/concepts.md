@@ -1,222 +1,314 @@
 # Concepts
 
-The field knowledge behind oneleaks's design decisions. [How Scanning & Sanitization Work](architecture.md) explains *what* the pipeline does, stage by stage. This page explains the *ideas* those stages are built on, so a design choice that looks arbitrary at first (why entropy alone isn't enough, why suppression runs before overlap resolution, why HMAC instead of a plain hash) has a reason attached.
+The field knowledge behind oneleaks's design decisions.
+
+[How Scanning & Sanitization Work](architecture.md) covers *what* the pipeline does. This page covers the *ideas* underneath, so choices that look arbitrary have a reason attached.
 
 ---
 
 ## 1. The three-layer detection problem
 
-Almost every scanner in this space (gitleaks, detect-secrets, TruffleHog, oneleaks) decomposes "is this string sensitive?" into layers, applied roughly in this order:
+Almost every scanner in this space (gitleaks, detect-secrets, TruffleHog, oneleaks) breaks "is this string sensitive?" into layers:
 
-```text
-1. Is this candidate shaped like something interesting?   (cheap, syntactic)
-2. Does context corroborate it?                            (keywords, structure)
-3. Can I independently verify it's actually valid?          (math or network)
-```
+| Layer | Question | Cost |
+|---|---|---|
+| Pattern | Is this shaped like something interesting? | cheap, syntactic |
+| Context | Does anything nearby corroborate it? | keywords, structure |
+| Verification | Can I independently confirm it's valid? | math or network |
 
-Why layer it instead of one big regex? Because each layer alone is either too slow, too noisy, or too narrow:
+Why not one big regex? Because each layer alone fails differently:
 
-* Pattern-only misses generic/unknown secret formats, and can't tell `password = "hello123"` from `password = "REDACTED"`.
-* Context-only (just the word "password") produces way too many false positives.
-* Entropy-only flags UUIDs, hashes, base64 images, minified JS (see [§3](#3-entropy-based-detection)).
+- **Pattern only** misses unknown formats, and can't tell `password = "hello123"` from `password = "REDACTED"`.
+- **Context only** (just the word "password") floods you with false positives.
+- **Entropy only** flags UUIDs, hashes, base64 images, and minified JS. See [§3](#3-entropy-based-detection).
 
-oneleaks's detection pipeline (candidate generation, disabled-rule filtering, suppression, overlap resolution, finding construction, config filters, see [Architecture](architecture.md#the-detection-pipeline)) is this exact idea, formalized.
+oneleaks's [detection pipeline](architecture.md#the-detection-pipeline) is this idea, formalized.
 
 ---
 
 ## 2. Pattern / signature matching
 
-The simplest layer: a regex that matches a known secret's fixed shape. Cloud providers often bake an identifiable prefix into their tokens specifically so scanners can find them:
+The simplest layer: a regex matching a known secret's fixed shape. Providers often bake an identifiable prefix into their tokens *specifically* so scanners can find them.
 
 ```text
-AWS access key      → AKIA[0-9A-Z]{16}
-GitHub PAT           → ghp_[A-Za-z0-9]{36}
-OpenAI key            → sk-proj-...
-Stripe secret key     → sk_live_...
+AWS access key    →  AKIA[0-9A-Z]{16}
+GitHub PAT        →  ghp_[A-Za-z0-9]{36}
+OpenAI key        →  sk-proj-...
+Stripe secret key →  sk_live_...
 ```
 
-This is high-precision (few false positives) but zero-recall on anything not in your pattern library (internal tools, new providers, one-off tokens). It's also the layer with the most "reinvent the wheel" risk. Hundreds of these patterns already exist, vetted and battle-tested, in projects like gitleaks' own rule file. Writing your own from scratch means re-discovering every edge case (trailing character classes, word boundaries, false-positive test strings) that others already found the hard way. This is exactly why oneleaks's [custom rules](rules.md) let you add your own patterns rather than requiring a fork.
+High precision, but zero recall on anything outside your pattern library: internal tools, new providers, one-off tokens.
 
-**ReDoS, the regex trap:** a badly written regex (nested quantifiers like `(a+)+b`) can take exponential time on adversarial input. This is "Regular Expression Denial of Service," and it matters here because a scanner runs regexes over arbitrary user/repo content, which is attacker-influenced in some workflows (e.g. scanning PR content). Prefer patterns adapted from well-exercised sources over hand-written ones for exactly this reason.
+It's also the layer with the most reinvent-the-wheel risk. Hundreds of vetted patterns already exist in projects like gitleaks' rule file. Writing your own means rediscovering every edge case others already hit. That's why oneleaks lets you [add your own patterns](rules.md) rather than fork.
+
+!!! danger "ReDoS: the regex trap"
+
+    A badly written regex with nested quantifiers like `(a+)+b` can take exponential time on crafted input. That's Regular Expression Denial of Service.
+
+    It matters here because a scanner runs regexes over arbitrary repo content, which is attacker-influenced in some workflows, such as scanning PR content.
+
+    Prefer patterns adapted from well-exercised sources over hand-written ones.
 
 ---
 
 ## 3. Entropy-based detection
 
-**The idea:** random data (a real API key, generated by a CSPRNG) looks statistically different from human-written text or structured data. Shannon entropy measures how surprising each character is, on average. A string using few distinct characters repeatedly has low entropy (`aaaaaaaa`), and a string where every character is close to equally likely has high entropy (`kX9$mQ2!vR`).
+Random data generated by a CSPRNG looks statistically different from human-written text. Shannon entropy measures how surprising each character is, on average.
 
 ```text
 entropy(s) = -Σ p(c) · log2(p(c))   for each character c in s
 ```
 
-In practice: extract token-like candidates (a run of base64-alphabet characters above some minimum length), compute entropy over just that candidate, and flag it if entropy exceeds a threshold.
+`aaaaaaaa` has low entropy. `kX9$mQ2!vR` has high entropy.
 
-**Why it produces false positives:** Shannon entropy only looks at the *local character distribution* of one string. It has no idea what's "normal" in real code. A UUID (`f47ac10b-58cc-4372-a567-0e02b2c3d479`) is high-entropy by this math but is almost never a secret. Same for git commit hashes, package checksums, and minified JS identifiers. This is the single biggest source of false positives in entropy-based scanners.
+In practice: extract token-like candidates, compute entropy over each, flag the ones above a threshold.
 
-**Where in oneleaks:** `oneleaks/detectors.py::entropy_candidates()`. Pure-hex runs and canonical UUID shapes are excluded via dedicated, exact checks before entropy is even computed, which is cheaper and more precise than trying to get one statistical threshold to handle every false-positive class at once.
+**Why it produces false positives.** Entropy only sees one string's local character distribution. It has no idea what's normal in real code.
+
+A UUID like `f47ac10b-58cc-4372-a567-0e02b2c3d479` scores as high-entropy but is almost never a secret. Same for commit hashes, package checksums, and minified identifiers. This is the single biggest false-positive source in entropy-based scanners.
+
+**In oneleaks:** `detectors.py::entropy_candidates()`. Pure-hex runs and UUID shapes are excluded by exact checks *before* entropy is computed — cheaper and more precise than tuning one threshold to handle every false-positive class.
 
 ---
 
 ## 4. Token efficiency (BPE): evaluated, not adopted
 
-In 2026, [Betterleaks](https://github.com/betterleaks/betterleaks), a successor to gitleaks from the same author, replaced raw Shannon entropy with a different signal: **token efficiency**, measured with a BPE (Byte-Pair Encoding) tokenizer, the same kind of tokenizer used to feed text into LLMs.
+In 2026 [Betterleaks](https://github.com/betterleaks/betterleaks), a gitleaks successor from the same author, replaced Shannon entropy with **token efficiency**, measured using a BPE tokenizer — the same kind that feeds text to an LLM.
 
-**The theory:** a BPE tokenizer is trained on a huge corpus and learns to merge frequently co-occurring byte sequences into single tokens. Structured-but-random-looking data (a UUID's hex-digit pairs and fixed hyphen positions, a git hash) tends to tokenize *efficiently* (few tokens per character) because the tokenizer has seen similar shapes constantly in training. A real secret generated by a CSPRNG is a genuinely novel byte sequence the tokenizer's training data never saw, so it tokenizes *inefficiently* (more tokens per character). Low token efficiency becomes a proxy for "this looks like true randomness, not structured-but-hex-looking data," a compression-ratio randomness test, conceptually a practical stand-in for Kolmogorov complexity.
+**The theory.** A BPE tokenizer learns to merge frequently co-occurring byte sequences into single tokens.
 
-**What we measured:** this was investigated as a candidate `oneleaks[bpe]` extra using `tiktoken`'s `cl100k_base` encoding, tested directly against the false-positive classes oneleaks's entropy detector actually sees. The result didn't hold up for oneleaks's specific pipeline:
+Structured-but-random-looking data tokenizes *efficiently*, because the tokenizer saw those shapes constantly during training. A genuine CSPRNG secret is a novel byte sequence, so it tokenizes *inefficiently*.
 
-```text
-fresh, genuinely random secrets (CSPRNG)     1.33 - 1.60 chars/token
-npm/yarn package-lock hash (sha512-...)       1.41 chars/token
-base64-encoded English sentence               1.38 chars/token
-base64-encoded JSON                           1.40 chars/token
-```
+Low token efficiency then acts as a proxy for true randomness — essentially a compression-ratio test.
 
-Real secrets and the base64-alphabet false-positive classes land in essentially the same band. The reason isn't that the underlying idea is wrong. It's that oneleaks's entropy detector *already* strips the false-positive classes token efficiency is best at catching (pure-hex runs and canonical UUID shapes) with cheap, exact, dependency-free checks, before entropy ever runs. Betterleaks' framing is "one general signal instead of hand-written carve-outs," but oneleaks was asked to add token efficiency *on top of* carve-outs that already handle that exact class, where it has nothing left to add. Betterleaks' own published benchmark (98.6% vs. 70.4% recall on the CredData dataset) reflects its evaluation setup, not an independent replication, and evidently measures a broader false-positive distribution than the one left over after oneleaks's existing checks.
+**What we measured.** Tested as a candidate `oneleaks[bpe]` extra using `tiktoken`'s `cl100k_base`, against the false-positive classes oneleaks actually sees:
 
-**Conclusion:** not adopted. A `tiktoken` dependency (and the loss of "PyYAML is the only required dependency") isn't worth taking on for a filter that, measured directly, doesn't discriminate real secrets from the false positives it would need to catch in oneleaks's specific pipeline. Worth revisiting only if a different, sharper metric surfaces, evaluated the same way: measured against oneleaks's actual candidate set, not taken on faith from a vendor benchmark.
+| Input | chars/token |
+|---|---|
+| Fresh CSPRNG secrets | 1.33 – 1.60 |
+| npm/yarn lockfile hash | 1.41 |
+| base64-encoded English | 1.38 |
+| base64-encoded JSON | 1.40 |
+
+Real secrets and false positives land in the same band. The signal doesn't separate them.
+
+**Why the idea isn't wrong, but doesn't help here.** oneleaks's entropy detector *already* strips the classes token efficiency is best at catching — pure-hex and UUIDs — using cheap exact checks, before entropy runs.
+
+Betterleaks' framing is "one general signal instead of hand-written carve-outs." Adding it *on top of* carve-outs that already handle that class leaves it nothing to do.
+
+??? note "On Betterleaks' published benchmark"
+
+    Betterleaks reports 98.6% vs. 70.4% recall on the CredData dataset.
+
+    That reflects its own evaluation setup rather than an independent replication, and it evidently measures a broader false-positive distribution than the one remaining after oneleaks's existing checks.
+
+**Conclusion: not adopted.** A `tiktoken` dependency, and losing "PyYAML is the only required dependency," isn't worth a filter that measurably doesn't discriminate in this pipeline.
+
+Worth revisiting only if a sharper metric appears — evaluated the same way, against oneleaks's real candidate set rather than taken on faith.
 
 ---
 
 ## 5. Structural-anchor detection
 
-Some secret formats are self-identifying, independent of entropy: PEM keys start with `-----BEGIN ... KEY-----` and end with a matching `-----END-----` line. JWTs are exactly three dot-separated base64url segments where the first segment decodes to recognizable JSON (`{"alg":"HS256",...}`).
+Some formats identify themselves, independent of entropy:
 
-When a format has a strong structural anchor like this, match the anchor first and treat entropy/validation as corroboration, not the primary signal. It's both more precise and avoids double-counting (a JWT segment is also technically high-entropy, so without anchor-priority you'd get two overlapping findings for one secret, see [§8](#8-overlap-resolution-and-rule-priority)).
+- **PEM keys** start with `-----BEGIN ... KEY-----` and end with a matching `-----END-----`.
+- **JWTs** are three dot-separated base64url segments whose first segment decodes to JSON containing `alg`.
 
-**Where in oneleaks:** the `pem-private-key`, `jwt`, and `connection-string-credential` rules in `oneleaks/builtin_rules/secrets.yaml`.
+When a format has an anchor this strong, match the anchor first and treat entropy as corroboration.
+
+That's more precise, and it avoids double-counting: a JWT segment is also high-entropy, so without anchor priority you'd get two findings for one secret. See [§8](#8-overlap-resolution-and-rule-priority).
+
+**In oneleaks:** the `pem-private-key`, `jwt`, and `connection-string-credential` rules in `builtin_rules/secrets.yaml`.
 
 ---
 
 ## 6. Validators: turning "looks like" into "is valid"
 
-A regex candidate can be checked against a mathematical or structural rule to filter out coincidental matches:
+A regex candidate can be checked against a mathematical rule to drop coincidental matches.
 
-* **Luhn algorithm** (credit cards): a checksum digit computed from the other digits using a simple doubling/summing rule. A random 16-digit number has roughly a 1-in-10 chance of passing Luhn by coincidence, much better odds than no check at all, and cheap to compute.
-* **IBAN / Mod-97**: international bank account numbers embed a checksum computed mod 97 over a rearranged version of the number.
-* **US SSN structural rules**: certain area/group/serial values are defined as always-invalid (`000`, `666`, `900-999` for area, `00` for group, `0000` for serial). SSNs used to also be validated against a state-assignment table, but the SSA's 2011 "randomization" removed the predictable state-to-area mapping, so that older validation approach now incorrectly rejects real, valid, post-2011 SSNs, a common bug in copy-pasted SSN validators worth knowing about even outside this project.
-* **IP addresses**: rather than a hand-written regex, oneleaks uses the standard library's `ipaddress` module, which already implements correct IPv4/IPv6 parsing (including edge cases like leading zeros and compressed IPv6 `::`).
+| Validator | Applies to | How it works |
+|---|---|---|
+| `luhn` | Credit cards, IMEI | Check digit from a doubling/summing rule |
+| `iban` | Bank accounts | Mod-97 checksum over a rearranged number |
+| `aba_routing` | US routing numbers | 3/7/1-weighted digit sum, mod 10 |
+| `ssn` | US SSNs | Structurally invalid ranges rejected |
+| `ipv4` / `ipv6` | IP addresses | stdlib `ipaddress` parsing |
+| `jwt` | JWTs | Header decodes to JSON containing `alg` |
 
-The general pattern: **regex narrows candidates, a validator confirms them.** This is why oneleaks's rule model has both a `pattern` and an optional `validator` field. See [Custom Rules](rules.md).
+The general pattern: **regex narrows candidates, a validator confirms them.** That's why a rule has both a `pattern` and an optional `validator`.
+
+??? note "The SSN validation bug worth knowing about"
+
+    SSNs were once validated against a state-assignment table mapping area numbers to states.
+
+    The SSA's 2011 randomization removed that mapping. Validators still using the old table now **reject real, valid, post-2011 SSNs**.
+
+    It's a common bug in copy-pasted SSN validators, worth recognizing outside this project too. oneleaks checks only the permanently-invalid ranges: area `000`, `666`, `900-999`; group `00`; serial `0000`.
 
 ---
 
 ## 7. Precision, recall, and why scanners tune differently
 
-Two numbers describe any classifier's behavior:
-
 ```text
-precision = true positives / (true positives + false positives)   "when I flag something, how often am I right?"
-recall    = true positives / (true positives + false negatives)   "of all real secrets, how many did I catch?"
+precision = true positives / (true positives + false positives)
+recall    = true positives / (true positives + false negatives)
 ```
 
-There's an inherent tradeoff. A scanner tuned to catch everything (high recall) will also flag more non-secrets (lower precision), and vice versa. Secret detection generally leans toward higher recall, because missing a real leaked credential is a much worse outcome than an extra false positive a human or agent has to dismiss.
+In plain terms: precision is "when I flag something, how often am I right?" Recall is "of all real secrets, how many did I catch?"
+
+The two trade off. Tuning for recall flags more non-secrets; tuning for precision misses more real ones.
+
+Secret detection leans toward recall, because a missed credential is far worse than a false positive someone dismisses.
 
 ---
 
 ## 8. Overlap resolution and rule priority
 
-One real secret can match multiple rules at once, e.g. an OpenAI key matches both the specific `openai-api-key` pattern *and* the generic high-entropy-string rule. Without a resolution step you'd emit two findings (and, worse, two different sanitized placeholders) for one secret.
+One secret can match several rules. An OpenAI key matches both `openai-api-key` and the generic high-entropy rule.
 
-The fix is a priority order, most-specific wins:
+Without resolution you'd emit two findings — and worse, two different placeholders — for one secret.
+
+The fix is a priority order, most specific wins:
 
 ```text
-structural anchor  >  provider-specific pattern  >  keyword-anchored generic pattern  >  generic credential assignment  >  entropy-only
+structural anchor > provider-specific > keyword-anchored generic
+                  > generic assignment > entropy-only
 ```
 
-and a rule: when two findings' spans overlap, keep only the highest-priority one.
+When two spans overlap, keep only the highest-priority finding.
 
-**Where in oneleaks:** `_resolve_overlaps()` in `oneleaks/scanner.py`. See [Architecture §4](architecture.md#4-overlap-resolution).
-
----
-
-## 9. Fingerprinting (identifying a secret without storing it)
-
-You often need to say "this is the same secret I saw before" (for baselines, for referential-consistency placeholders) without keeping the raw value around. The standard technique is a **keyed hash**, HMAC rather than a plain hash, specifically because a plain hash of a low-entropy value is reversible by brute force: an attacker can hash every possible input once and build a lookup table (a "rainbow table") to match against your fingerprints. Mixing in a secret key defeats that, provided the key itself is kept separate from anything that ships the fingerprints.
-
-**Where in oneleaks:** `_compute_fingerprint()` in `oneleaks/scanner.py`. See [Architecture §Fingerprinting](architecture.md#fingerprinting) for the exact formula, key resolution order, and a concrete example of why this matters for a specific low-entropy PII type.
+**In oneleaks:** `_resolve_overlaps()`. See [Architecture §4](architecture.md#4-overlap-resolution).
 
 ---
 
-## 10. Redaction vs. tokenization (and why oneleaks does both)
+## 9. Fingerprinting
+
+You often need to say "this is the same secret I saw before" — for baselines, for consistent placeholders — without keeping the value.
+
+The standard technique is a **keyed hash (HMAC)**, not a plain hash.
+
+A plain hash of a low-entropy value is reversible by brute force. An attacker hashes every possible input once and builds a lookup table. A secret key defeats that, provided the key stays separate from anything shipping the fingerprints.
+
+**In oneleaks:** `_compute_fingerprint()`. See [Architecture §Fingerprinting](architecture.md#fingerprinting) for the formula and key resolution order.
+
+---
+
+## 10. Redaction vs. tokenization
 
 Two different things get called "sanitization":
 
-* **Redaction** (one-way): replace the sensitive value with something generic (`***`, `[REDACTED]`). You can never get the original back from the output alone.
-* **Tokenization** (reversible): replace the sensitive value with a token, but keep a separate mapping (a "vault") from token to original value, so an authorized process can look it up later. This is the same idea used in payment processing (a credit card number becomes a token, and the real number lives only in a PCI-compliant vault) and in LLM-gateway products that redact PII before a prompt reaches the model, then reinsert real values into the model's *output* before it's acted on.
+| | Redaction | Tokenization |
+|---|---|---|
+| Direction | One-way | Reversible |
+| Output | `***`, `[REDACTED]` | A token plus a separate mapping |
+| Recovery | Impossible from output alone | Authorized lookup via the vault |
 
-oneleaks's `sanitize()` with `reveal=True` plus `desanitize()` is tokenization, not just redaction. The mapping file *is* the vault. That's why it's never written by default, gets restrictive file permissions, and prints a "don't commit this" warning when it is: a leaked mapping file is exactly as bad as a leaked secret, because it undoes the whole protection.
+Tokenization is the same idea payment processors use: a card number becomes a token, and the real number lives only in a compliant vault. LLM gateways do it too — redact PII before the prompt, reinsert real values into the output.
 
-**Where in oneleaks:** [Sanitization](sanitization.md).
+oneleaks's `sanitize(reveal=True)` plus `desanitize()` is tokenization. **The mapping file *is* the vault.**
+
+That's why it's never written by default, gets `0600` permissions, and prints a warning when written. A leaked mapping file is exactly as bad as a leaked secret.
+
+**In oneleaks:** [Sanitization](sanitization.md).
 
 ---
 
-## 11. Live credential verification (TruffleHog's approach), and why oneleaks doesn't do it
+## 11. Live credential verification, and why oneleaks doesn't do it
 
-TruffleHog's standout feature is calling the actual provider's API with a candidate credential to check if it's *currently valid*. This eliminates a whole class of false positives (expired keys, example/test keys) that no amount of pattern/entropy analysis can catch, because validity is a fact about the provider's live state, not about the string's shape.
+TruffleHog's standout feature is calling the provider's API to check whether a candidate credential is *currently valid*.
 
-The cost: it requires network access and per-provider integration code that has to track auth quirks, rate limits, and endpoint churn across hundreds of provider APIs indefinitely, a sustained maintenance burden a small pure-Python library isn't positioned to carry the way a team with a dedicated security-research org is. It also means the scanner is no longer purely deterministic/offline (a "verified: false" result might just mean the network call failed, not that the key is invalid). oneleaks's README says "no network calls **required**" deliberately, not "never," so an opt-in verification mode wouldn't literally break that promise, but the maintenance cost is the real reason it isn't built. Good to understand the technique exists, even though oneleaks doesn't do it.
+That kills a whole class of false positives — expired keys, example keys — which no amount of pattern or entropy analysis can catch. Validity is a fact about the provider's live state, not the string's shape.
+
+**Why oneleaks doesn't:**
+
+- It needs per-provider integration code tracking auth quirks, rate limits, and endpoint churn across hundreds of APIs, indefinitely. That's a sustained maintenance burden a small library isn't positioned to carry.
+- The scanner stops being deterministic and offline. A `verified: false` result might just mean the network call failed.
+
+The README says "no network calls **required**" deliberately, not "never" — an opt-in mode wouldn't break that promise. Maintenance cost is the real reason.
 
 ---
 
 ## 12. Declarative rules vs. plugin architecture
 
-Two different ways scanners let you extend detection:
+Two ways scanners let you extend detection:
 
-* **Declarative** (gitleaks' TOML, oneleaks's YAML/JSON rules): a rule is *data*, a pattern, keywords, severity, no executable code. Safe to load from an untrusted or shared repo config, easy to review in a PR, but limited to what the schema expresses.
-* **Plugin/imperative** (detect-secrets' Python `BasePlugin` classes, oneleaks's `PythonRule`): a rule is *code*, arbitrary logic (a checksum, a lookup against a known-format table, whatever). More powerful, but must never be auto-loaded from a repo config file, or you've built a remote-code-execution vector: anyone who can add a file to the repo could get code to run in your CI.
+| | Declarative | Plugin / imperative |
+|---|---|---|
+| A rule is | Data: pattern, keywords, severity | Code: arbitrary logic |
+| Examples | gitleaks TOML, oneleaks YAML/JSON | detect-secrets plugins, `PythonRule` |
+| Power | Limited to the schema | Unlimited |
+| Safe to auto-load? | **Yes** | **Never** |
 
-oneleaks deliberately supports both, with an explicit security boundary: YAML/JSON can never execute code, and Python rules require explicit, opt-in registration in your own code, never auto-discovery. See [Custom Rules](rules.md).
+Auto-loading code from repo config is a remote-code-execution vector: anyone who can add a file could run code in your CI.
+
+oneleaks supports both with an explicit boundary. YAML and JSON can never execute code. Python rules require opt-in registration in your own code, never auto-discovery. See [Custom Rules](rules.md).
 
 ---
 
-## 13. Allowlists and baselines (false-positive management)
+## 13. Allowlists and baselines
 
-Every real-world scanner accumulates known false positives (test fixtures, example keys in docs, etc.) that you don't want re-flagged every run. Three common mechanisms, increasing in scope:
+Every real scanner accumulates known false positives — test fixtures, example keys in docs. Three mechanisms, increasing in scope:
 
-* **Inline suppression**: a comment next to the specific line (`# oneleaks: allow`), for one-off known-safe values.
-* **Allowlist**: a rule in config that exempts a path, pattern, or specific rule ID entirely, for things that are *structurally* always safe (a fixtures directory). oneleaks's `allow.paths` treats matching content as genuinely not sensitive, which is why it also applies to `sanitize()`. Nothing there needs redacting.
-* **Baseline**: a snapshot file of currently-known findings (by fingerprint, not raw value), against which future scans diff. New findings not in the baseline fail the check, and existing ones are tracked as accepted debt. This is the standard adoption path for turning a scanner on against a codebase that already has findings (`detect-secrets scan > .secrets.baseline` is the reference UX oneleaks's `--baseline` mirrors). Unlike an allowlist, a baselined finding is still a real secret, just one already triaged, so it deliberately does *not* suppress `sanitize()`'s redaction of it, only `scan()`'s reporting.
+**Inline suppression.** A comment next to the line (`# oneleaks: allow`), for one-off known-safe values.
 
-**Where in oneleaks:** [Custom Rules §Inline suppression](rules.md#inline-suppression), [Configuration §Baselines](configuration.md#baselines).
+**Allowlist.** Config that exempts a path or rule entirely, for things *structurally* always safe like a fixtures directory. `allow.paths` treats matching content as genuinely not sensitive, which is why it applies to `sanitize()` too — nothing there needs redacting.
+
+**Baseline.** A snapshot of current findings, stored by fingerprint, that future scans diff against. New findings fail; existing ones are tracked as accepted debt. It's the standard way to adopt a scanner on a codebase that already has findings.
+
+!!! important "A baselined finding is still a real secret"
+
+    Unlike an allowlist, a baseline says "already triaged," not "not sensitive."
+
+    So it deliberately suppresses `scan()`'s *reporting* but **not** `sanitize()`'s redaction. A known secret must never leak into sanitized output.
+
+**In oneleaks:** [Inline suppression](rules.md#inline-suppression), [Baselines](configuration.md#baselines).
 
 ---
 
 ## 14. Git scanning: changed vs. staged vs. history
 
-* **Changed**: files that differ from the last commit, working-tree version (what's currently on disk, uncommitted).
-* **Staged**: files as they exist in git's *index* (what `git add` has queued for the next commit). This can differ from the working-tree version if you edited a file after staging it. Scanning staged content means reading from the index, not just re-reading the file from disk.
-* **History**: every commit ever made, including ones no longer on any branch tip. A secret committed and later "removed" is still recoverable from history unless you rewrite it. This is why history scanning is a distinct, heavier feature from working-tree scanning.
+| Mode | Reads | Catches |
+|---|---|---|
+| **Changed** | Working tree, files differing from HEAD | What's on disk right now |
+| **Staged** | Git's index | What `git add` queued, which can differ from disk |
+| **History** | Every commit's diff | Secrets committed and later removed |
 
-**Where in oneleaks:** `oneleaks.git.scan_changed()` / `scan_staged()` / `scan_history()`. See [CLI §Git history scanning](cli.md#git-history-scanning).
+Staged and changed genuinely differ: edit a file after staging it and the two disagree. Scanning staged content reads the index, not the file.
+
+History matters because a secret committed and later "removed" stays recoverable until history is rewritten. That's why it's a separate, heavier feature.
+
+**In oneleaks:** `scan_changed()` / `scan_staged()` / `scan_history()`. See [CLI](cli.md#git-history-scanning).
 
 ---
 
 ## 15. MCP (Model Context Protocol)
 
-A protocol (from Anthropic) that lets an LLM-based agent call out to external tools/servers in a standardized way: a plugin API for LLM agents, using JSON-RPC-like messages over stdio or HTTP. An "MCP server" exposes a set of callable tools, and any MCP-compatible agent can then use them without custom per-agent integration code.
+A protocol from Anthropic that lets an LLM agent call external tools in a standardized way — effectively a plugin API for agents, over stdio or HTTP.
 
-For oneleaks, this matters because the natural way to plug `scan`/`sanitize` into an arbitrary agent runtime, instead of writing custom glue code for every agent framework, is to expose them as MCP tools once. See [MCP Server](mcp.md).
+An MCP server exposes callable tools, and any compatible agent can use them without per-agent integration code.
+
+For oneleaks, that's the natural way to plug `scan` and `sanitize` into an arbitrary agent runtime: expose them once instead of writing glue for every framework. See [MCP Server](mcp.md).
 
 ---
 
 ## Glossary
 
-| Term | One-line definition |
+| Term | Definition |
 |---|---|
-| Shannon entropy | Statistical measure of how "surprising"/random a string's characters are |
-| Token efficiency | A BPE-tokenizer-compression-based entropy alternative (Betterleaks), evaluated for oneleaks and not adopted. See [§4](#4-token-efficiency-bpe-evaluated-not-adopted) |
-| ReDoS | Regex Denial of Service, a pathological regex takes exponential time on crafted input |
-| Luhn algorithm | Checksum formula used to validate credit card numbers |
-| Mod-97 | Checksum formula used to validate IBANs |
-| HMAC | Keyed hash function that resists brute-force reversal that plain hashing doesn't |
-| Fingerprint | A one-way, non-reversible identifier for a value, used to recognize repeats without storing the value |
-| Redaction | One-way replacement of a sensitive value (can't recover the original) |
-| Tokenization | Reversible replacement, a separate mapping/vault lets you recover the original |
+| Shannon entropy | Statistical measure of how random a string's characters are |
+| Token efficiency | BPE-compression-based entropy alternative; evaluated and not adopted, see [§4](#4-token-efficiency-bpe-evaluated-not-adopted) |
+| ReDoS | Regex Denial of Service; a pathological regex takes exponential time on crafted input |
+| Luhn | Checksum validating credit card numbers and IMEIs |
+| Mod-97 | Checksum validating IBANs |
+| HMAC | Keyed hash that resists the brute-force reversal plain hashing allows |
+| Fingerprint | One-way identifier used to recognize a repeated value without storing it |
+| Redaction | One-way replacement; the original can't be recovered |
+| Tokenization | Reversible replacement; a separate vault recovers the original |
 | Precision | Of things flagged, what fraction are real |
 | Recall | Of real things, what fraction got flagged |
-| Allowlist | Config-level exemption for a path/rule/pattern, treats content as genuinely not sensitive |
-| Baseline | Snapshot of accepted findings, used to fail only *new* findings. The finding is still treated as sensitive |
-| Structural anchor | A fixed, recognizable marker (e.g. `-----BEGIN KEY-----`) used to detect a format directly, without relying on entropy |
-| Declarative rule | A rule expressed as data (regex/keywords), not executable code, safe to load from untrusted config |
-| MCP | Model Context Protocol, standard way for LLM agents to call external tools |
+| Allowlist | Config exemption treating content as genuinely not sensitive |
+| Baseline | Snapshot of accepted findings; fails only on *new* ones, still treats them as sensitive |
+| Structural anchor | A fixed marker like `-----BEGIN KEY-----` used to detect a format directly |
+| Declarative rule | A rule expressed as data, not code; safe to load from untrusted config |
+| MCP | Model Context Protocol; standard way for agents to call external tools |

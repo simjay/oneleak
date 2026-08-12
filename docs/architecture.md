@@ -1,102 +1,177 @@
 # How Scanning & Sanitization Work
 
-This page explains the actual mechanism behind `scan()` and `sanitize()`: the pipeline stages, why they're ordered the way they are, and the specific bugs that ordering was chosen to avoid. If you just want to *use* oneleaks, see [Quickstart](quickstart.md). This page is for understanding or extending its internals.
+How `scan()` and `sanitize()` actually work inside: the pipeline stages, and why they run in this order.
+
+Reading this is optional. If you only want to *use* oneleaks, start with the [Quickstart](quickstart.md).
 
 ## The detection pipeline
 
-Every scan (text, a file, a directory, a git diff hunk) goes through the same sequence, implemented in `oneleaks/scanner.py::scan_text()`:
+Every scan runs the same six stages, whether the input is text, a file, a directory, or a git diff hunk. The code lives in `oneleaks/scanner.py::scan_text()`.
 
 ```mermaid
 flowchart TD
-    A[Input text] --> B[Candidate generation]
-    B --> C[Disabled-rule filtering]
-    C --> D[Suppression<br/>#35; oneleaks: allow]
-    D --> E[Overlap resolution]
-    E --> F[Finding construction<br/>preview + fingerprint]
-    F --> G[Config filters<br/>severity_overrides, allow.paths]
+    A[Input text] --> B[1 · Candidate generation]
+    B --> C[2 · Disabled-rule filtering]
+    C --> D[3 · Suppression<br/>#35; oneleaks: allow]
+    D --> E[4 · Overlap resolution]
+    E --> F[5 · Finding construction<br/>preview + fingerprint]
+    F --> G[6 · Config filters<br/>severity_overrides, allow.paths]
     G --> H[Findings]
 ```
 
 ### 1. Candidate generation
 
-`_generate_candidates()` collects raw matches from four independent sources, each producing a `RuleMatch(start, end)` span before anything is filtered or ranked:
+Four detectors run independently over the input. Each returns raw `RuleMatch(start, end)` spans, before any filtering or ranking.
 
-- **Regex rules** (`detectors.py::regex_candidates()`): every built-in and custom declarative rule with a `pattern`. If the rule also has `keywords`, a match only counts if one of those keywords appears within ~60 characters before it on the same line (`_has_keyword_context()`). This is what lets a rule like `aws-secret-access-key` require both a specific 40-character shape *and* nearby context, instead of flagging every base64-looking string in a codebase.
+| Detector | What it matches | Source |
+|---|---|---|
+| **Regex rules** | Built-in and custom rules with a `pattern` | `regex_candidates()` |
+| **Generic assignment** | `password = "..."`, `api_key: ...`, `TOKEN=...` | `generic_assignment_candidates()` |
+| **Entropy** | Base64-alphabet runs of 20-100 chars with high Shannon entropy | `entropy_candidates()` |
+| **Python rules** | Whatever your `PythonRule.detect()` returns | your code |
 
-  **This is not a keyword-prefilter architecture.** Some scanners (Betterleaks, for instance) run a fast keyword search first and only run the slower regex against text that passed it, as a large-repo performance optimization. oneleaks does the opposite order: every rule's regex always runs over the entire input first, and `keywords` (when present) is checked only against a window near an *already-found* regex match, purely to reduce false positives, never to skip work. No keyword search ever narrows what a regex sees, and there's no separate "did any keyword appear in this file at all" pass. Simpler and correctness-first, at the cost of always paying full regex cost regardless of keyword presence.
-- **Generic assignment detection** (`detectors.py::generic_assignment_candidates()`): a single regex over key names like `password`, `token`, `api_key`, matched against common assignment syntax (`key = "value"`, `key: value`, `KEY=value`). This is what catches secrets that don't match any specific provider's format.
-- **Entropy detection** (`detectors.py::entropy_candidates()`): scans for base64-alphabet runs (20-100 characters) and computes Shannon entropy on each. Deliberately excludes pure-hex runs (git hashes and checksums are indistinguishable from real secrets by entropy alone) and known-shape false positives like UUIDs. This is the lowest-confidence, lowest-priority signal. See [Overlap resolution](#4-overlap-resolution) below.
-- **Python rules**: any `PythonRule` instances passed via `rules=[...]`, called directly. Never auto-loaded from files. See [Custom Rules](rules.md).
+Two details worth knowing:
 
-Each regex match with a `validator` (`luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`) is checked immediately. A candidate that fails validation is dropped before it ever becomes a `_Candidate`, not filtered out later.
+- **Keywords narrow matches, they don't find them.** If a rule has `keywords`, a regex match only counts when one of those keywords appears within ~60 characters before it on the same line. This lets `aws-secret-access-key` require both a 40-character shape *and* nearby context.
+- **Validators run immediately.** A match with a `validator` (`luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`, `aba_routing`) is checked on the spot. Failures are dropped here, not filtered out later.
+
+??? note "Why oneleaks doesn't use a keyword prefilter"
+
+    Some scanners run a fast keyword search first, then run the slower regex only on text that passed. It's a performance optimization for large repositories.
+
+    oneleaks does the opposite. Every regex always runs over the whole input, and `keywords` is checked afterwards, against a window near a match that was already found.
+
+    The tradeoff: oneleaks pays full regex cost regardless of keyword presence, and gains a simpler pipeline with no "did any keyword appear in this file" pass to keep correct.
 
 ### 2. Disabled-rule filtering
 
-Rules turned off via `.oneleaks.yaml`'s `disabled_rules` or `pii: {<type>: false}` are removed next (`_disabled_rule_ids()`). This happens before suppression and overlap resolution so a disabled rule never competes for a span in the first place.
+Rules switched off in `.oneleaks.yaml` are removed next, via `disabled_rules` or `pii: {<type>: false}`.
 
-### 3. Suppression: *before* overlap resolution, deliberately
+This runs early on purpose, so a disabled rule never competes for a span in stage 4.
 
-Inline `# oneleaks: allow` (optionally scoped to a rule ID) is applied next. This ordering is load-bearing, not incidental: suppression used to run *after* overlap resolution, and that was a real bug. Consider:
+### 3. Suppression
 
-```python
-api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleaks: allow aws-access-key-id
-```
+Inline `# oneleaks: allow` comments are applied here, optionally scoped to one rule ID.
 
-Two rules match this span: `aws-access-key-id` (priority 100) and the generic-assignment rule (priority 50). [Overlap resolution](#4-overlap-resolution) keeps only the higher-priority one. If suppression ran *after* that resolution, scoping the `allow` comment to `aws-access-key-id` would discard the only surviving candidate for that span: the generic-assignment rule that would have caught it independently was already gone, discarded during overlap resolution before suppression got a say. The result: a narrowly-scoped suppression silently suppressed *everything* on that line, not just the one rule.
+!!! warning "This stage must run before overlap resolution"
 
-Running suppression first fixes this: the suppressed candidate is removed from the pool, then overlap resolution runs on what's left, so `generic-secret` is free to win the span and still get reported.
+    It used to run after, and that was a real bug. Take this line:
+
+    ```python
+    api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleaks: allow aws-access-key-id
+    ```
+
+    Two rules match that span: `aws-access-key-id` (priority 100) and the generic-assignment rule (priority 50). Overlap resolution keeps only the winner.
+
+    Suppressing *after* resolution meant the generic-assignment candidate was already discarded. Removing the winner then left nothing, so a comment scoped to one rule silently suppressed the whole line.
+
+    Suppressing first leaves the generic rule in the pool, free to win the span and still be reported.
 
 ### 4. Overlap resolution
 
-One value can match multiple rules: an OpenAI key is both `openai-api-key`-shaped *and* high-entropy. `_resolve_overlaps()` sorts all surviving candidates by `(priority descending, span length descending, start position, rule ID)` and greedily accepts non-overlapping candidates in that order, so the highest-priority rule always wins a contested span:
+One value often matches several rules. An OpenAI key is both `openai-api-key`-shaped *and* high-entropy.
 
-```text
-structural anchor (PEM, JWT, connection-string): 110
-provider-specific pattern (AWS, GitHub, OpenAI, ...):  90-100
-keyword-anchored generic pattern (Datadog, Azure):      70
-generic credential assignment:                          50
-entropy-only:                                            10
-```
+`_resolve_overlaps()` sorts every surviving candidate by `(priority desc, span length desc, start, rule ID)`, then greedily accepts non-overlapping candidates in that order. Highest priority wins a contested span.
 
-Structural-anchor formats sit *above* provider-specific patterns because a connection-string password can incidentally look like an email address's `local@domain` shape. The more structurally-specific match should win regardless of span length.
+| Tier | Priority | Examples |
+|---|---|---|
+| Structural anchor | 110 | PEM, JWT, connection string |
+| Provider-specific | 90-100 | AWS, GitHub, OpenAI |
+| Keyword-anchored generic | 70 | Datadog, Azure |
+| Generic assignment | 50 | `password = ...` |
+| Entropy only | 10 | high-entropy string |
+
+Structural anchors outrank provider patterns because a connection-string password can incidentally look like an email's `local@domain` shape. The more structurally specific match should win regardless of span length.
 
 ### 5. Finding construction
 
-Each surviving candidate becomes a `Finding`: line/column computed from the byte offset, a masked `preview` (`_safe_preview()`, type-specific, e.g. `a***@example.com` for email, `<PRIVATE_KEY>` for keys, never the raw value), and a `fingerprint` (see below). Raw sensitive values are never stored on a `Finding`.
+Each surviving candidate becomes a `Finding` carrying line and column, a masked `preview`, and a `fingerprint`.
+
+Previews are type-specific: `a***@example.com` for email, `<PRIVATE_KEY>` for keys. **A `Finding` never holds the raw value.**
 
 ### 6. Config filters
 
-Finally, `_apply_config_filters()` applies `severity_overrides` (swap a finding's severity per `.oneleaks.yaml`) and `allow.paths` (drop findings under an allowed path entirely). This step, along with disabled-rule filtering, is applied through one shared function, `scan_text_with_config()`, used identically by `scan()`, `git.scan_changed()`/`scan_staged()`/`scan_history()`, and `sanitize()`. That's deliberate: earlier, each of those entry points independently reimplemented "apply the config," and each one launched with a slightly different bug (`git.py` and later `sanitize()` both shipped without `allow.paths`/`disabled_rules` support at various points before this was consolidated). One shared function means that class of bug can't reappear at a fourth call site.
+Finally `_apply_config_filters()` applies two things from `.oneleaks.yaml`:
+
+- `severity_overrides` swaps a finding's severity
+- `allow.paths` drops findings under matching paths entirely
+
+??? note "Why every entry point shares one function"
+
+    Config filtering runs through a single shared function, `scan_text_with_config()`, used identically by `scan()`, all three `git.scan_*()` functions, and `sanitize()`.
+
+    Each of those once applied config themselves, and each shipped with a different piece missing. Both `git.py` and `sanitize()` went out without `allow.paths` support at some point.
+
+    One shared function means that class of bug can't reappear at a fourth call site.
 
 ## Fingerprinting
 
-A fingerprint identifies a value without storing it: `HMAC-SHA256(key, rule_id + ":" + normalized_value)`, truncated and prefixed by category (`sec_`, `pii_`, `sen_`, or `fnd_` for a custom Python rule's non-standard category). The key is, in order of preference: an explicit key passed by the caller, the `ONELEAKS_FINGERPRINT_KEY` environment variable, or a random 32-byte key generated once per process and reused for that process's lifetime.
+A fingerprint identifies a value without storing it:
 
-HMAC (not a plain hash) matters specifically for low-entropy values like SSNs. A plain `sha256(ssn)` is reversible by brute force (there are only ~10 billion possible SSNs, so an attacker can hash all of them once and build a lookup table). Mixing in a secret key defeats that, *provided the key itself never ends up alongside the fingerprints it produced*. See the warning in [Sanitization](sanitization.md#the-mapping-file-is-a-vault-not-a-log) about the equivalent risk for mapping files.
+```text
+HMAC-SHA256(key, rule_id + ":" + normalized_value)
+```
+
+The result is truncated and prefixed by category: `sec_`, `pii_`, `sen_`, or `fnd_` for a custom Python rule with a non-standard category.
+
+The key is chosen in this order:
+
+1. An explicit key passed by the caller
+2. The `ONELEAKS_FINGERPRINT_KEY` environment variable
+3. A random 32-byte key, generated once per process
+
+!!! info "Why HMAC instead of a plain hash"
+
+    It matters for low-entropy values like SSNs. There are only about 10 billion possible SSNs, so `sha256(ssn)` is reversible: an attacker hashes all of them once and builds a lookup table.
+
+    A secret key defeats that, **as long as the key never travels alongside the fingerprints it produced.** The same risk applies to [mapping files](sanitization.md#the-mapping-file-is-a-vault-not-a-log).
 
 ## Sanitization
 
-`sanitize()` reuses `scan()`'s findings. It is not a second detection system. The algorithm, in `sanitizer.py::sanitize_text()`:
+`sanitize()` reuses `scan()`'s findings. It is not a second detection system.
 
-1. **Assign placeholders.** Findings are processed in text order. Each gets a placeholder `<TYPE_N>` where `TYPE` is the finding's `type` uppercased and `N` increments per type. Before assigning a new number, the finding's fingerprint is checked against fingerprints already seen in this call (or carried in via `seed_mapping`, for cross-call consistency). A repeated value reuses its existing placeholder instead of getting a new number. This is why `alice@example.com` mentioned three times in one document becomes `<EMAIL_1>` all three times, not `<EMAIL_1>`, `<EMAIL_2>`, `<EMAIL_3>`.
-2. **Replace right-to-left.** Findings are sorted by start offset *descending* and replaced in that order. This is the only replacement order that's safe without re-computing offsets after every substitution: replacing a span earlier in the text would shift the character positions of every finding after it, invalidating their stored offsets. Replacing from the end backwards means each replacement only affects text *after* the point already processed.
-3. **Build the mapping, conditionally.** If `reveal=True`, a `MappingEntry(value, rule_id, fingerprint)` is recorded per placeholder. If not, this step is skipped entirely and `result.mapping` stays `None`. This is the one deliberate exception to "never return raw values by default," and it's opt-in for a reason: see [Sanitization](sanitization.md) for what that mapping actually is (a reversible token vault, not an audit log) and how to handle it safely.
+**1. Assign placeholders.** Each finding gets `<TYPE_N>`, where `TYPE` is its type uppercased and `N` counts up per type.
 
-`desanitize()` is the inverse: a plain per-placeholder string replace, `text.replace(placeholder, entry.value)` for each mapping entry. Placeholders in the mapping that never appear in the given text, and placeholder-shaped tokens in the text that aren't in the mapping, are left untouched rather than raising, since sanitized text often passes through an LLM before coming back, and the model may not echo every placeholder verbatim.
+Before assigning a new number, oneleaks checks the finding's fingerprint against ones already seen. A repeated value reuses its placeholder.
+
+That's why `alice@example.com` appearing three times becomes `<EMAIL_1>` all three times, not `<EMAIL_1>`, `<EMAIL_2>`, `<EMAIL_3>`. Passing `seed_mapping` extends this consistency across separate calls.
+
+**2. Replace right to left.** Findings are replaced in descending order of start offset.
+
+This is the only order that's safe without recomputing offsets after every substitution. Replacing an earlier span shifts the position of everything after it. Working backwards means each replacement only touches text already processed.
+
+**3. Build the mapping, only if asked.** With `reveal=True`, each placeholder records a `MappingEntry(value, rule_id, fingerprint)`. Otherwise this step is skipped and `result.mapping` stays `None`.
+
+This is the one deliberate exception to "never return raw values by default." See [Sanitization](sanitization.md) for how to handle that mapping safely.
+
+### Reversing it
+
+`desanitize()` is a plain string replace, one per mapping entry.
+
+Unmatched placeholders are left alone rather than raising, in both directions. Sanitized text often passes through an LLM before coming back, and the model may not echo every placeholder verbatim.
 
 ## Git history scanning
 
-`git.scan_history()` (see [CLI Reference](cli.md#git-history-scanning)) needs to find secrets that were committed and later removed, something scanning current content can never do. The naive approach (rescan every file's full content at every commit) is correctness-safe but wastefully redundant: a file touched 50 times gets rescanned in full 50 times.
+`git.scan_history()` finds secrets that were committed and later removed, which scanning current content can never do.
 
-Instead, `_commit_diff_hunks()` parses `git diff --unified=0`'s output per commit and extracts only the *added* lines, grouped by diff hunk. A hunk's added lines are joined into one text blob (preserving their relative newlines) before being run through the normal `scan_text_with_config()` pipeline, the same pipeline described above, just fed a diff hunk's content instead of a whole file.
+Rescanning every file at every commit would work but is wasteful: a file touched 50 times gets read 50 times in full.
 
-The join-into-one-blob step is not an optimization detail. It's a correctness requirement. Scanning each added line independently, one `scan_text()` call per line, would break multi-line secret formats. A PEM private key's `-----BEGIN...-----` and `-----END...-----` markers can be many lines apart. If each line were scanned as an isolated string, the two markers would never appear in the same piece of text for the PEM regex to match across. Joining a hunk's added lines into one blob preserves that adjacency while still only scanning what the commit actually introduced.
+Instead, `_commit_diff_hunks()` parses `git diff --unified=0` per commit and keeps only the *added* lines, grouped by hunk. Each hunk's added lines are joined into one blob and run through the normal pipeline.
 
-Each finding's line number is then translated from "line within the hunk" back to "line within the file at that point in history" using the hunk's starting line (parsed from the `@@ -a,b +start,count @@` header), and stamped with the commit SHA that introduced it (`Finding.commit`).
+!!! important "Joining a hunk into one blob is correctness, not optimization"
+
+    Scanning added lines one at a time would break multi-line formats.
+
+    A PEM private key's `-----BEGIN-----` and `-----END-----` markers sit many lines apart. Scanned as isolated strings, the two markers never appear in the same text, so the regex can never match across them.
+
+    Joining preserves that adjacency while still only scanning what the commit actually introduced.
+
+Line numbers are then translated from hunk-relative back to file-relative using the hunk header, and stamped with the commit SHA that introduced them (`Finding.commit`).
 
 ## See also
 
-- [Sanitization](sanitization.md): the reversible-mapping workflow and how to use it safely from an agent
-- [Custom Rules](rules.md): the rule schema and priority tiers in more detail
-- [CLI Reference](cli.md#git-history-scanning): `--history` flags and defaults
-- `oneleaks/scanner.py`, `oneleaks/detectors.py`, `oneleaks/sanitizer.py`, `oneleaks/git.py`: the actual implementation. Every function named on this page lives in one of those four files
+- [Sanitization](sanitization.md) — the reversible-mapping workflow, and using it safely from an agent
+- [Custom Rules](rules.md) — rule schema and priority tiers
+- [CLI Reference](cli.md#git-history-scanning) — `--history` flags and defaults
+
+Every function named on this page lives in `scanner.py`, `detectors.py`, `sanitizer.py`, or `git.py`.

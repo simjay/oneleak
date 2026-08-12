@@ -4,7 +4,12 @@
 
 ```bash
 pip install oneleaks
-pip install "oneleaks[mcp]"   # + MCP server for agent runtimes
+```
+
+Add the MCP server if you want agent runtimes to call oneleaks directly:
+
+```bash
+pip install "oneleaks[mcp]"
 ```
 
 Or from source:
@@ -14,38 +19,50 @@ git clone https://github.com/simjay/oneleaks && cd oneleaks
 pip install -e ".[mcp]"
 ```
 
-Requires Python >= 3.11.
+Requires Python 3.11 or newer.
 
-## Scan text
+## Your first scan
 
-```python
-import oneleaks
+=== "CLI"
 
-result = oneleaks.scan("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
+    ```bash
+    oneleaks scan .
+    ```
 
-result.safe      # False
-result.risk      # "critical"
-result.findings  # list[Finding]
-```
+    Exit codes: `0` clean, `1` findings, `2` error. That's what makes it usable in CI.
 
-Each `Finding` never carries the raw sensitive value, only a masked `preview` (`sk-p****789`) and an HMAC-based `fingerprint` you can use to recognize repeats.
+=== "Python"
 
-## Scan files and directories
+    ```python
+    import oneleaks
+
+    result = oneleaks.scan("OPENAI_API_KEY=sk-proj-...\nemail=alice@example.com")
+
+    result.safe      # False
+    result.risk      # "critical"
+    result.findings  # list[Finding]
+    ```
+
+A `Finding` never carries the raw value. You get a masked `preview` like `sk-p****789`, plus an HMAC `fingerprint` for recognizing repeats.
+
+## Scanning files and directories
 
 ```python
 from pathlib import Path
 
-oneleaks.scan(Path("config.yaml"))
-oneleaks.scan(Path("."))
+oneleaks.scan(Path("config.yaml"))   # one file
+oneleaks.scan(Path("."))             # whole tree
 ```
 
 !!! warning "A `str` is always content, never a path"
 
-    `oneleaks.scan("config.yaml")` scans the eleven characters `config.yaml`. It does **not** open that file. Wrap filesystem input in `Path(...)`, as above. This is deliberate: guessing whether a string is a path or a payload would silently read files when you meant to scan text.
+    `oneleaks.scan("config.yaml")` scans those eleven characters. It does **not** open the file.
 
-Binary files and files over 10 MB are skipped automatically. `.git/`, `node_modules/`, `.venv/`, `venv/`, `__pycache__/`, `dist/`, and `build/` are excluded by default.
+    Wrap filesystem input in `Path(...)`. Guessing whether a string is a path or a payload would silently read files when you meant to scan text.
 
-## Sanitize
+Binary files and anything over 10 MB are skipped. Common noise directories like `.git/`, `node_modules/`, and `.venv/` are excluded automatically — the full list is in [Configuration](configuration.md#fields).
+
+## Sanitizing
 
 ```python
 safe = oneleaks.sanitize("Email alice@example.com twice: alice@example.com")
@@ -53,24 +70,26 @@ print(safe.text)
 # Email <EMAIL_1> twice: <EMAIL_1>
 ```
 
-Repeated values reuse the same placeholder within one call. See [Sanitization](sanitization.md) for the reversible-mapping (`reveal=True` / `desanitize()`) workflow.
+The same value reuses the same placeholder within a call, so the text stays coherent.
 
-## Scan git changes
+To recover the originals later, see the reversible-mapping workflow in [Sanitization](sanitization.md).
+
+## Scanning git
 
 ```python
 oneleaks.git.scan_changed()  # working-tree changes + untracked files
-oneleaks.git.scan_staged()   # staged (index) content, not the working-tree version
-oneleaks.git.scan_history()  # commit history: finds secrets later removed from the tree
+oneleaks.git.scan_staged()   # staged content, which can differ from disk
+oneleaks.git.scan_history()  # commits, including secrets since removed
 ```
 
-This is the core "did the agent just leak something" loop: scan after every edit, act on findings before continuing.
+`scan_changed()` is the core agent loop: scan after every edit, act on findings before continuing.
+
+`scan_history()` catches what the others structurally can't — a secret committed last year and deleted since is still in the repo.
 
 ## Next steps
 
-- [CLI Reference](cli.md) for `oneleaks scan` / `sanitize` / `desanitize`
-- [Configuration](configuration.md) for `.oneleaks.yaml`
-- [Baselines](configuration.md#baselines) to adopt oneleaks on a repo that already has findings, without a blocking flag-day
-- [Custom Rules](rules.md) to extend detection without forking the library
-- [MCP Server](mcp.md) to expose scan/sanitize as tools for an agent runtime
-- [How Scanning & Sanitization Work](architecture.md) for the detection pipeline in detail
-- [Concepts](concepts.md) for the field knowledge behind the design (entropy, validators, fingerprinting, and why some competitor techniques weren't adopted)
+- [CLI Reference](cli.md) — every command and flag
+- [Configuration](configuration.md) — `.oneleaks.yaml`
+- [Baselines](configuration.md#baselines) — adopt oneleaks on a repo that already has findings
+- [Custom Rules](rules.md) — extend detection without forking
+- [MCP Server](mcp.md) — expose scan and sanitize to an agent

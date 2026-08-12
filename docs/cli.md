@@ -37,7 +37,9 @@ oneleaks scan . --baseline .oneleaks-baseline.json                     # only re
 
 ### Git history scanning
 
-`oneleaks scan .`, `--changed`, and `--staged` only see *current* content. A secret committed and later removed is still fully recoverable from git history unless it's been rewritten, and `--history` is what catches that:
+`scan .`, `--changed`, and `--staged` only see *current* content.
+
+A secret that was committed and later deleted stays recoverable from history until someone rewrites it. `--history` is what finds those.
 
 ```bash
 oneleaks scan --history                     # current branch, most recent 5000 commits
@@ -46,9 +48,13 @@ oneleaks scan --history --max-commits 0     # no cap
 oneleaks scan --history --all-refs          # every branch and tag, not just HEAD
 ```
 
-Findings from `--history` include a `commit` field (the commit that introduced the secret), shown as `path:line@abcd1234` in human output and `"commit"` in JSON. Defaulting to current-branch history capped at 5000 commits (rather than `--all-refs` with no cap) avoids a surprise multi-hour run on a large repo's first scan. If the cap truncates the scan, a warning is printed to stderr rather than failing silently.
+History findings carry a `commit` field naming the commit that introduced the secret. Human output shows it as `path:line@abcd1234`.
 
-Detection works on each commit's diff (only what that commit actually added), not the whole file at every commit, so a file changed 50 times isn't rescanned in full 50 times. Multi-line formats (like a PEM private key) are still detected correctly because each diff hunk's added lines are joined into one block before scanning, not scanned line by line.
+**Defaults are conservative on purpose.** Current branch only, capped at 5000 commits, so a first run on a large repo doesn't turn into a surprise multi-hour scan. When the cap truncates a scan, you get a stderr warning rather than a silent partial result.
+
+**Only added lines are scanned**, per commit diff, not whole files at every commit. A file touched 50 times isn't read 50 times over.
+
+Multi-line formats like PEM keys still match correctly, because each hunk's added lines are joined into one block before scanning. See [why that join matters](architecture.md#git-history-scanning).
 
 ### Exit codes
 
@@ -101,7 +107,9 @@ Sanitized content is written to stdout, and diagnostics go to stderr, so this co
 | `--map PATH` | Write a placeholder → raw-value mapping file, enabling later reversal with `oneleaks desanitize`. **Never written unless you pass this flag.** |
 | `--config PATH` | Path to a `.oneleaks.yaml` config file. |
 
-The mapping file is written with `0600` permissions and a stderr warning, because it contains raw sensitive values by design. Treat it exactly as sensitively as the original content. Don't commit it.
+!!! danger "The mapping file contains raw values by design"
+
+    It's written with `0600` permissions and a stderr warning. Treat it exactly as sensitively as the original content, and don't commit it.
 
 ## `oneleaks desanitize`
 
@@ -109,7 +117,9 @@ The mapping file is written with `0600` permissions and a stderr warning, becaus
 oneleaks desanitize sanitized.txt --map mapping.json
 ```
 
-Reverses a prior `sanitize --map` output: replaces each placeholder found in the input with its mapped raw value. Placeholders in the mapping that don't appear in the input, and placeholder-shaped tokens in the input that aren't in the mapping, are left untouched rather than raising.
+Reverses a prior `sanitize --map` run, replacing each placeholder with its mapped value.
+
+Mismatches are tolerated in both directions rather than raising: placeholders missing from the input, and placeholder-shaped tokens missing from the mapping, are left untouched.
 
 | Flag | Description |
 |---|---|
