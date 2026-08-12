@@ -37,6 +37,9 @@ PAD_X = 95  # bar padding, left and right
 BAR_TOP, BAR_BOT = 775, -130
 STRIKE_H = 85
 
+# Breathing room around the banner assets, in the same font units.
+PAD_V, PAD_H = 200, 40
+
 # word colour, bar colour, ghost colour
 VARIANTS = {
     "light": ("#14141C", "#14141C", "#FFFFFF"),
@@ -100,11 +103,18 @@ def mark(word_c: str) -> tuple[str, float]:
 
 
 def document(width: float, body: str, px_height: int = 44) -> str:
-    ratio = width / HEIGHT * px_height
+    """Wrap `body` in a padded SVG.
+
+    The padding is baked into the asset rather than applied where it is used.
+    GitHub strips inline CSS from README markdown, so a margin declared there
+    would be dropped and the banner would sit flush against the badges below.
+    """
+    w, h = width + 2 * PAD_H, HEIGHT + 2 * PAD_V
+    ratio = w / h * px_height
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {HEIGHT:.0f}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.0f} {h:.0f}" '
         f'width="{ratio:.0f}" height="{px_height}" role="img" aria-label="oneleaks">\n'
-        f'  <g transform="translate(0,{BAR_TOP}) scale(1,-1)">{body}</g>\n'
+        f'  <g transform="translate({PAD_H},{BAR_TOP + PAD_V}) scale(1,-1)">{body}</g>\n'
         f"</svg>\n"
     )
 

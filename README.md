@@ -139,5 +139,3 @@ make lint     # ruff check + ruff format --check + mypy
 make test     # pytest with coverage
 make ci       # lint + test + docs-build (what GitHub Actions runs)
 ```
-
-See [AGENTS.md](AGENTS.md) for a repo orientation aimed at coding agents, [CONTRIBUTING.md](CONTRIBUTING.md) for the human contribution guide, and [docs/](https://oneleaks.readthedocs.io/) for full documentation.
