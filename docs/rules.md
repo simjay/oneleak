@@ -6,7 +6,7 @@ Three rule sources compose into one registry:
 |---|---|---|
 | Built-in | YAML shipped with oneleaks | Always on |
 | YAML / JSON | Data | Yes, via `rule_paths` or `rules=[...]` |
-| Python | Code | **No** — explicit registration only |
+| Python | Code | **No**, explicit registration only |
 
 Rule IDs must be unique across all three. A duplicate, including one colliding with a built-in, raises `ConfigError` at load time.
 
@@ -50,7 +50,7 @@ result = oneleaks.scan(text, rules=["company-rules.yaml"])
 
 **Priority defaults:** 80 with a pattern, 60 for keyword-only. For context, built-in rules use 90–110, generic assignment uses 50, and entropy uses 10. See [overlap resolution](architecture.md#4-overlap-resolution).
 
-**Keywords** must appear within roughly 60 characters before the match, on the same line. They reduce false positives on generic patterns — they don't make matching faster.
+**Keywords** must appear within roughly 60 characters before the match, on the same line. They reduce false positives on generic patterns. They do not make matching faster.
 
 ## JSON rules
 
@@ -72,7 +72,7 @@ Same shape, JSON-encoded:
 
 ## Python rules
 
-For logic a regex can't express — a proprietary checksum, an internal ID format:
+For logic a regex cannot express, such as a proprietary checksum or an internal ID format:
 
 ```python
 import oneleaks
@@ -95,7 +95,7 @@ result = oneleaks.scan(text, rules=[EmployeeIdRule()])
 
 !!! danger "Python rules are never auto-loaded"
 
-    They come only from an explicit `rules=[...]` argument in your own code — never from repository config.
+    They come only from an explicit `rules=[...]` argument in your own code, never from repository config.
 
     Silently loading executable rules from a file anyone could commit would be a remote-code-execution vector in your CI.
 

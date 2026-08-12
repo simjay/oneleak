@@ -42,18 +42,18 @@ Detection is deterministic. No external binary, no network service, no ML model.
 
 **Start here**
 
-- [Quickstart](quickstart.md) — install, first scan, first sanitize
-- [Configuration](configuration.md) — `.oneleaks.yaml`, and adopting oneleaks on an existing codebase
+- [Quickstart](quickstart.md): install, first scan, first sanitize
+- [Configuration](configuration.md): `.oneleaks.yaml`, and adopting oneleaks on an existing codebase
 
 **Using it**
 
-- [CLI Reference](cli.md) — every command and flag
-- [Custom Rules](rules.md) — add your own patterns
-- [Sanitization](sanitization.md) — the reversible-mapping workflow
-- [MCP Server](mcp.md) — expose oneleaks to agent runtimes
+- [CLI Reference](cli.md): every command and flag
+- [Custom Rules](rules.md): add your own patterns
+- [Sanitization](sanitization.md): the reversible-mapping workflow
+- [MCP Server](mcp.md): expose oneleaks to agent runtimes
 
 **Understanding it**
 
-- [How Scanning & Sanitization Work](architecture.md) — the pipeline, stage by stage
-- [Concepts](concepts.md) — entropy, validators, fingerprinting, and the reasoning behind the design
-- [API Reference](api.md) — generated from docstrings
+- [How Scanning & Sanitization Work](architecture.md): the pipeline, stage by stage
+- [Concepts](concepts.md): entropy, validators, fingerprinting, and the reasoning behind the design
+- [API Reference](api.md): generated from docstrings

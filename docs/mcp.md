@@ -46,7 +46,7 @@ The server auto-discovers `.oneleaks.yaml` from its working directory, the same 
 
 !!! tip "Point the client's working directory at your project root"
 
-    Otherwise your project config — excluded paths, disabled rules, severity overrides — won't apply.
+    Otherwise your project config will not apply: excluded paths, disabled rules, severity overrides.
 
 ## Tools
 

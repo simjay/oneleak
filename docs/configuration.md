@@ -77,10 +77,10 @@ A [baseline](#baselines) is the primary tool: snapshot today's findings, then fa
 
 These compose well alongside it:
 
-- **`--fail-on high`** — let low and medium findings report without breaking the build, then tighten over time.
-- **`allow.paths`** — exempt directories of known-intentional content.
-- **`disabled_rules` / `severity_overrides`** — silence or downgrade one noisy rule instead of a whole path.
-- **`# oneleaks: allow <rule-id>`** — a targeted, reviewable, line-level exemption. See [Custom Rules](rules.md#inline-suppression).
+- **`--fail-on high`**: let low and medium findings report without breaking the build, then tighten over time.
+- **`allow.paths`**: exempt directories of known-intentional content.
+- **`disabled_rules` / `severity_overrides`**: silence or downgrade one noisy rule instead of a whole path.
+- **`# oneleaks: allow <rule-id>`**: a targeted, reviewable, line-level exemption. See [Custom Rules](rules.md#inline-suppression).
 
 ## Baselines
 
@@ -88,7 +88,7 @@ A baseline records `(rule_id, path, fingerprint)` for findings your team has see
 
 It lets you turn oneleaks on for a repo that already has findings, with no flag-day: snapshot what exists today, and only new findings fail the build.
 
-Baselines store **no raw values** — just rule IDs, paths, and HMAC fingerprints. They're safe to commit, and *should* be committed so the whole team and CI agree on what's accepted.
+Baselines store **no raw values**, only rule IDs, paths, and HMAC fingerprints. They're safe to commit, and *should* be committed so the whole team and CI agree on what's accepted.
 
 **Create or refresh:**
 
@@ -108,7 +108,7 @@ Only findings *not* in the baseline are reported or affect the exit code.
 
 ### The stable-key requirement
 
-Baseline matching uses `Finding.fingerprint`, an HMAC keyed off a random value generated **fresh per process** — unless `ONELEAKS_FINGERPRINT_KEY` is set.
+Baseline matching uses `Finding.fingerprint`, an HMAC keyed off a random value generated **fresh per process**, unless `ONELEAKS_FINGERPRINT_KEY` is set.
 
 Without a stable key, today's fingerprints would never match tomorrow's, or CI's, or a teammate's. The baseline would silently match nothing.
 
@@ -124,7 +124,7 @@ So `--baseline` refuses to run until the variable is set, rather than failing qu
 
 `--baseline` is a CLI flag only. It is not a `.oneleaks.yaml` field or a `Config` option.
 
-That's deliberate. A baselined finding is **still a real secret** sitting in the code — triaged, but not safe.
+That's deliberate. A baselined finding is **still a real secret** sitting in the code. Triaged, but not safe.
 
 Config filters like `allow.paths` apply uniformly to `scan()`, git scanning, *and* `sanitize()`, because an allowlisted path is treated as genuinely not sensitive. Routing baselines through that same pipeline would have let a known secret leak into sanitized output.
 

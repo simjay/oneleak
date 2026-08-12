@@ -1,9 +1,7 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mark-on-dark.svg">
-  <img src="docs/assets/mark-on-light.svg" alt="" width="56" height="56">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lockup-on-dark.svg">
+  <img src="docs/assets/lockup-on-light.svg" alt="oneleaks" width="360">
 </picture>
-
-# oneleaks
 
 [![PyPI](https://img.shields.io/pypi/v/oneleaks?style=flat-square)](https://pypi.org/project/oneleaks/)
 [![Python](https://img.shields.io/pypi/pyversions/oneleaks?style=flat-square)](https://pypi.org/project/oneleaks/)
@@ -12,9 +10,24 @@
 [![License](https://img.shields.io/pypi/l/oneleaks?style=flat-square)](LICENSE)
 [![Ruff](https://img.shields.io/badge/code_style-ruff-261230?style=flat-square)](https://github.com/astral-sh/ruff)
 
-oneleaks is a lightweight, pure-Python scanner and sanitizer for secrets and PII, designed to run anywhere Python runs: agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, no network calls required (the one exception: `git` itself, used only by `oneleaks.git`).
+**One scanner for secrets *and* PII.** Most tools do one or the other. gitleaks and detect-secrets find credentials but ship no PII rules at all, so catching both normally means running two tools and merging two report formats. oneleaks finds both in a single pass, and redacts both with the same call.
 
-Full docs: **[oneleaks.readthedocs.io](https://oneleaks.readthedocs.io/)**. The [architecture](https://oneleaks.readthedocs.io/en/latest/architecture/) page explains the detection pipeline and sanitization algorithm in detail.
+```console
+$ oneleaks scan .
+[critical] openai-api-key (openai_api_key) at config.py:1 -- sk-p****aaa
+[high] ssn (ssn) at seed.py:1 -- ***-**-6789
+[high] credit-card (credit_card) at seed.py:2 -- ************1111
+[low] email (email) at seed.py:3 -- a***@example.com
+```
+
+Every finding carries a `category` of `secret`, `pii`, or `sensitive`, so you can still route or filter them separately.
+
+```python
+secrets = [f for f in result.findings if f.category == "secret"]
+pii     = [f for f in result.findings if f.category == "pii"]
+```
+
+It is lightweight and pure-Python, designed to run anywhere Python runs: agent workflows, pre-commit hooks, CI, and embedded pipelines. No external binary, no ML models, and no network calls required. The one exception is `git` itself, used only by `oneleaks.git`.
 
 ## Install
 

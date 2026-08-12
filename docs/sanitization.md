@@ -1,21 +1,22 @@
 # Sanitization
 
-`sanitize()` reuses `scan()`'s findings. There's no second detection system to keep in sync.
+`sanitize()` reuses `scan()`'s findings, so it redacts secrets and PII in the same call. There's no second detection system to keep in sync, and no separate pass for each category.
 
 ## Typed, numbered placeholders
 
 ```python
-result = oneleaks.sanitize(
-    "Email alice@example.com using key sk-proj-xxxx. Contact alice@example.com again."
-)
-print(result.text)
+text = "Email alice@example.com using key sk-proj-" + "x" * 20 + ". Contact alice@example.com again."
+
+print(oneleaks.sanitize(text).text)
 ```
 
 ```text
 Email <EMAIL_1> using key <OPENAI_API_KEY_1>. Contact <EMAIL_1> again.
 ```
 
-Two things are happening:
+One call, two categories: the key is a secret, the address is PII, and both are redacted together.
+
+Two more things are happening:
 
 - **Repeated values reuse one placeholder.** Both mentions of `alice@example.com` become `<EMAIL_1>`, so the text still reads coherently.
 - **Distinct values get distinct numbers.** A second address would be `<EMAIL_2>`.
@@ -38,7 +39,7 @@ assert restored == text
 
 ### Why reversibility matters for agents
 
-An agent can work entirely on sanitized text — the model never sees a real secret — and rehydrate only at the moment of acting:
+An agent can work entirely on sanitized text, so the model never sees a real secret. The real value comes back only at the moment of acting:
 
 ```python
 safe = oneleaks.sanitize(tool_output, reveal=True)
@@ -72,4 +73,4 @@ A value appearing in both outputs now reuses the same placeholder.
 
 - Replacements run **right to left**, by descending start offset, so earlier replacements don't invalidate later offsets.
 - Overlapping findings are resolved *before* replacement. See [overlap resolution](architecture.md#4-overlap-resolution).
-- `desanitize()` is a plain per-placeholder string replace. Placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left alone rather than raising — sanitized text often round-trips through a model that won't echo every placeholder verbatim.
+- `desanitize()` is a plain per-placeholder string replace. Placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left alone rather than raising. Sanitized text often round-trips through a model that will not echo every placeholder verbatim.

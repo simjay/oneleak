@@ -60,17 +60,23 @@ oneleaks.scan(Path("."))             # whole tree
 
     Wrap filesystem input in `Path(...)`. Guessing whether a string is a path or a payload would silently read files when you meant to scan text.
 
-Binary files and anything over 10 MB are skipped. Common noise directories like `.git/`, `node_modules/`, and `.venv/` are excluded automatically — the full list is in [Configuration](configuration.md#fields).
+Binary files and anything over 10 MB are skipped. Common noise directories like `.git/`, `node_modules/`, and `.venv/` are excluded automatically. The full list is in [Configuration](configuration.md#fields).
 
 ## Sanitizing
 
+One call redacts secrets and PII together:
+
 ```python
-safe = oneleaks.sanitize("Email alice@example.com twice: alice@example.com")
-print(safe.text)
-# Email <EMAIL_1> twice: <EMAIL_1>
+text = "key=sk-proj-" + "a" * 20 + " ssn=123-45-6789 mail alice@example.com and alice@example.com"
+
+print(oneleaks.sanitize(text).text)
+# key=<OPENAI_API_KEY_1> ssn=<SSN_1> mail <EMAIL_1> and <EMAIL_1>
 ```
 
-The same value reuses the same placeholder within a call, so the text stays coherent.
+Two things to notice:
+
+- **Placeholders are typed**, so the redacted text still says what *kind* of value was there.
+- **A repeated value reuses its placeholder**, so the text stays coherent.
 
 To recover the originals later, see the reversible-mapping workflow in [Sanitization](sanitization.md).
 
@@ -84,12 +90,12 @@ oneleaks.git.scan_history()  # commits, including secrets since removed
 
 `scan_changed()` is the core agent loop: scan after every edit, act on findings before continuing.
 
-`scan_history()` catches what the others structurally can't — a secret committed last year and deleted since is still in the repo.
+`scan_history()` catches what the others structurally cannot. A secret committed last year and deleted since is still in the repo.
 
 ## Next steps
 
-- [CLI Reference](cli.md) — every command and flag
-- [Configuration](configuration.md) — `.oneleaks.yaml`
-- [Baselines](configuration.md#baselines) — adopt oneleaks on a repo that already has findings
-- [Custom Rules](rules.md) — extend detection without forking
-- [MCP Server](mcp.md) — expose scan and sanitize to an agent
+- [CLI Reference](cli.md): every command and flag
+- [Configuration](configuration.md): `.oneleaks.yaml`
+- [Baselines](configuration.md#baselines): adopt oneleaks on a repo that already has findings
+- [Custom Rules](rules.md): extend detection without forking
+- [MCP Server](mcp.md): expose scan and sanitize to an agent
