@@ -1,5 +1,13 @@
 PY := oneleak tests scripts
 
+# mkdocs-material prints an unconditional multi-line advocacy notice about
+# MkDocs 2.0 on every invocation (see material/templates/__init__.py: it
+# never checks the installed mkdocs version). It's red-on-stderr and reads
+# like a build error in CI logs, but says nothing about this project. Our
+# actual response to MkDocs 2.0 is the `mkdocs<2.0` pin in pyproject.toml.
+# NO_MKDOCS_2_WARNING is the opt-out that same file provides.
+export NO_MKDOCS_2_WARNING := true
+
 .PHONY: install format lint test bench build publish publish-test \
         docs-serve docs-build docs-deploy clean ci
 

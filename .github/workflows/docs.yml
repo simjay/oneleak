@@ -41,9 +41,19 @@ jobs:
       - name: Deploy to GitHub Pages
         run: make docs-deploy
 
+      # The `secrets` context is not available in a step-level `if:`, only
+      # `vars` is, so the token presence is checked inside the script body
+      # instead. Skips cleanly when neither is configured.
       - name: Trigger Read the Docs build (optional)
-        if: ${{ vars.RTD_PROJECT_SLUG != '' && secrets.RTD_API_TOKEN != '' }}
+        if: ${{ vars.RTD_PROJECT_SLUG != '' }}
+        env:
+          RTD_API_TOKEN: ${{ secrets.RTD_API_TOKEN }}
+          RTD_PROJECT_SLUG: ${{ vars.RTD_PROJECT_SLUG }}
         run: |
+          if [ -z "$RTD_API_TOKEN" ]; then
+            echo "RTD_API_TOKEN not set, skipping RTD build trigger."
+            exit 0
+          fi
           curl -fsS -X POST \
-            -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}" \
-            "https://readthedocs.org/api/v3/projects/${{ vars.RTD_PROJECT_SLUG }}/versions/latest/builds/"
+            -H "Authorization: Token $RTD_API_TOKEN" \
+            "https://readthedocs.org/api/v3/projects/$RTD_PROJECT_SLUG/versions/latest/builds/"
