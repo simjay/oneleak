@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lockup-on-dark.svg">
-  <img src="docs/assets/lockup-on-light.svg" alt="oneleaks" width="360">
+  <img src="docs/assets/lockup-on-light.svg" alt="oneleaks" width="560">
 </picture>
 
 [![PyPI](https://img.shields.io/pypi/v/oneleaks?style=flat-square)](https://pypi.org/project/oneleaks/)
