@@ -373,3 +373,52 @@ class TestBaselineFlag:
 
         data = json.loads(baseline.read_text(encoding="utf-8"))
         assert data["findings"] == []
+
+
+class TestOutputFilters:
+    """--category and --severity narrow the reported set, so output, JSON and
+    the exit code agree. --fail-on only moves the exit code.
+    """
+
+    MIXED = (
+        'key = "sk-proj-' + "a" * 24 + '"\nemail = "alice@corp.com"\ncard = "4111111111111111"\n'
+    )
+
+    def _repo(self, tmp_path):
+        (tmp_path / "app.py").write_text(self.MIXED)
+        return str(tmp_path)
+
+    def test_category_secret_hides_pii(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path), "--category", "secret"])
+        out = capsys.readouterr().out
+        assert "openai-api-key" in out
+        assert "email" not in out and "credit-card" not in out
+
+    def test_category_is_repeatable(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path), "--category", "secret", "--category", "pii"])
+        out = capsys.readouterr().out
+        assert "openai-api-key" in out and "email" in out
+
+    def test_severity_filters_output_not_just_exit_code(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path), "--severity", "high"])
+        out = capsys.readouterr().out
+        assert "credit-card" in out
+        assert "email" not in out
+
+    def test_filters_apply_to_json_too(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path), "--category", "pii", "--json"])
+        payload = json.loads(capsys.readouterr().out)
+        assert {f["category"] for f in payload["findings"]} == {"pii"}
+
+    def test_filtering_everything_out_is_a_clean_exit(self, tmp_path, capsys):
+        code = main(["scan", self._repo(tmp_path), "--category", "sensitive"])
+        assert code == 0
+        assert "No findings." in capsys.readouterr().out
+
+    def test_summary_line_counts_by_severity(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path)])
+        assert "3 findings: 1 critical, 1 high, 1 low" in capsys.readouterr().out
+
+    def test_summary_is_singular_for_one_finding(self, tmp_path, capsys):
+        main(["scan", self._repo(tmp_path), "--category", "secret"])
+        assert "1 finding: 1 critical" in capsys.readouterr().out

@@ -17,10 +17,10 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from oneleaks.config import discover_config
+from oneleaks.findings import finding_to_dict
 from oneleaks.models import Finding, MappingEntry, severity_rank
 from oneleaks.sanitizer import desanitize as _desanitize
 from oneleaks.sanitizer import sanitize as _sanitize
-from oneleaks.scanner import finding_to_dict
 from oneleaks.scanner import scan as _scan
 
 mcp = FastMCP("oneleaks")

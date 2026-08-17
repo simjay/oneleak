@@ -2,7 +2,8 @@
 
 A lightweight, **pure-Python** scanner and sanitizer for secrets and PII.
 
-It runs anywhere Python runs: local development, pre-commit hooks, CI, and agent workflows.
+It runs anywhere Python runs: local development, pre-commit hooks, CI, and agent
+workflows.
 
 ```python
 import oneleaks
@@ -22,38 +23,44 @@ print(safe.text)
 
 | Category | Examples |
 |---|---|
-| **Secrets** | Provider API keys, generic credential assignments, high-entropy tokens, private keys, JWTs, connection strings |
+| **Secrets** | Provider API keys, private keys, JWTs, connection strings, generic credential assignments, high-entropy tokens |
 | **PII** | Email, phone, SSN, credit card, IPv4/IPv6, IBAN, IMEI, MAC address, routing numbers |
 | **Your own** | Custom YAML, JSON, or Python rules |
 
-Detection is deterministic. No external binary, no network service, no ML model.
+Detection is deterministic: the same input always gives the same answer. No
+external binary, no network service, no ML model.
 
 ## Why oneleaks
 
 **Pure Python.** `pip install oneleaks` and go. No Go binary, no Docker image.
 
-**One scanner for secrets *and* PII.** Most tools pick one. oneleaks does both in a single pass.
+**One scanner for secrets *and* PII.** Most tools pick one. oneleaks does both
+in a single pass, so you get one report instead of two.
 
-**Sanitization is first-class.** `sanitize()` replaces values with typed, numbered placeholders like `<EMAIL_1>`, and can optionally export a reversible mapping.
+**Sanitization is first-class.** `sanitize()` replaces each value with a typed,
+numbered placeholder like `<EMAIL_1>`, and can optionally export a reversible
+mapping.
 
-**Agent-friendly.** Fast enough to run on every agent turn, with JSON output, stdin/stdout piping, and `git.scan_changed()` for "what did the agent just touch?"
+**Agent-friendly.** Fast enough to run on every agent turn, with JSON output,
+stdin/stdout piping, and `git.scan_changed()` for "what did the agent just
+touch?"
 
 ## Where to go next
 
 **Start here**
 
-- [Quickstart](quickstart.md): install, first scan, first sanitize
-- [Configuration](configuration.md): `.oneleaks.yaml`, and adopting oneleaks on an existing codebase
+- [Quickstart](getting-started/quickstart.md): install, first scan, first sanitize
+- [Configuration](getting-started/configuration.md): `.oneleaks.yaml`, and adopting oneleaks on an existing codebase
 
 **Using it**
 
-- [CLI Reference](cli.md): every command and flag
-- [Custom Rules](rules.md): add your own patterns
-- [Sanitization](sanitization.md): the reversible-mapping workflow
-- [MCP Server](mcp.md): expose oneleaks to agent runtimes
+- [CLI Reference](guides/cli.md): every command and flag
+- [Custom Rules](guides/rules.md): add your own patterns
+- [Sanitization](guides/sanitization.md): the reversible-mapping workflow
+- [MCP Server](guides/mcp.md): expose oneleaks to agent runtimes
 
 **Understanding it**
 
-- [How Scanning & Sanitization Work](architecture.md): the pipeline, stage by stage
-- [Concepts](concepts.md): entropy, validators, fingerprinting, and the reasoning behind the design
-- [API Reference](api.md): generated from docstrings
+- [How Scanning & Sanitization Work](advanced/architecture.md): the pipeline, stage by stage
+- [Concepts](advanced/concepts.md): entropy, validators, fingerprinting, and the reasoning behind the design
+- [API Reference](reference/api.md): generated from docstrings

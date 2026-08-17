@@ -43,7 +43,7 @@ def require_stable_fingerprint_key() -> None:
             "--baseline requires a stable fingerprint key: set the "
             "ONELEAKS_FINGERPRINT_KEY environment variable (same value on every "
             "machine/CI run that reads or writes this baseline). See "
-            "docs/configuration.md#baselines."
+            "docs/getting-started/configuration.md#baselines."
         )
 
 

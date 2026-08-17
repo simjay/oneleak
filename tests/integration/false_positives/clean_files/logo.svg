@@ -1,0 +1,19 @@
+<!--
+What this catches: drawings being reported as network addresses.
+
+SVG path data is a stream of numbers separated by dots and commas. Four of
+those in a row parse as an IPv4 address.
+-->
+
+What this catches: drawings being reported as network addresses.
+
+An SVG image is drawn using long lists of numbers separated by dots and
+commas. Four of those numbers in a row look exactly like an IP address. We
+checked 15 real SVG files and found 81 wrong reports, every one of them just
+part of a drawing.-->
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path d="M13.28.85.45c.13-1.59,1.3-2.25,2.52-2.8.89-.13.28.85.45-.07.08-.45-.43-.56-.88Z"/>
+  <path d="M10.33.93.12c1.87.2-6-12.17-27-21.37,2.44-11.56,2.84-11.83,14.72-10.33Z"/>
+  <path d="M2.41.09.42,1.73-10.21,7-12.95l.17.1c1.51-1.25,2.54-.6,3.38.85.9,3.79Z"/>
+</svg>

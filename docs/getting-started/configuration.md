@@ -2,6 +2,10 @@
 
 oneleaks reads an optional `.oneleaks.yaml` from your project root.
 
+The CLI looks in the current folder, then each folder above it, and uses the closest one it finds. So if you run a scan from a subfolder, it still picks up the project's config.
+
+Write `exclude` and `allow.paths` patterns relative to the config file itself, not to wherever you happen to be. oneleaks adjusts them for you when the scan starts in a different folder.
+
 !!! note "Only the CLI auto-discovers it"
 
     The Python API never loads config on its own. You pass it explicitly with `scan(config=...)`, so library calls stay side-effect-free.
@@ -57,6 +61,12 @@ Some directories are **always** excluded regardless of your `exclude` list:
 .pytest_cache/  .mypy_cache/  .ruff_cache/  .hypothesis/
 ```
 
+Lock files are handled differently. `go.sum`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `Gemfile.lock` and about a dozen others are recognised by name, and two rules are switched off in them: `high-entropy-string` and `generic-secret`.
+
+Both flag a value on shape alone, and a lockfile is almost entirely integrity hashes, which are indistinguishable from a credential by entropy. Leaving them on meant hundreds of false positives on any Go or Node repository.
+
+Only those two detectors are skipped, not the whole file. A private-registry URL carrying `user:password` in a lockfile is a real leak, so every provider, connection-string and PII rule still runs.
+
 Available `pii` keys: `email`, `phone`, `ssn`, `credit_card`, `ipv4`, `ipv6`, `iban`, `imei`, `mac_address`, `bank_routing_number`.
 
 !!! tip "`exclude` and `allow.paths` are not the same"
@@ -80,7 +90,7 @@ These compose well alongside it:
 - **`--fail-on high`**: let low and medium findings report without breaking the build, then tighten over time.
 - **`allow.paths`**: exempt directories of known-intentional content.
 - **`disabled_rules` / `severity_overrides`**: silence or downgrade one noisy rule instead of a whole path.
-- **`# oneleaks: allow <rule-id>`**: a targeted, reviewable, line-level exemption. See [Custom Rules](rules.md#inline-suppression).
+- **`# oneleaks: allow <rule-id>`**: a targeted, reviewable, line-level exemption. See [Custom Rules](../guides/rules.md#inline-suppression).
 
 ## Baselines
 
@@ -118,7 +128,7 @@ So `--baseline` refuses to run until the variable is set, rather than failing qu
 
     Use the same key everywhere the baseline is read or written, and store it like any other shared secret: a password manager, or a CI secret store.
 
-    A leaked key makes every fingerprint in the baseline brute-forceable for low-entropy values like SSNs. See [Fingerprinting](architecture.md#fingerprinting).
+    A leaked key makes every fingerprint in the baseline brute-forceable for low-entropy values like SSNs. See [Fingerprinting](../advanced/architecture.md#fingerprinting).
 
 ### Baselines are a CLI concept
 
@@ -126,6 +136,6 @@ So `--baseline` refuses to run until the variable is set, rather than failing qu
 
 That's deliberate. A baselined finding is **still a real secret** sitting in the code. Triaged, but not safe.
 
-Config filters like `allow.paths` apply uniformly to `scan()`, git scanning, *and* `sanitize()`, because an allowlisted path is treated as genuinely not sensitive. Routing baselines through that same pipeline would have let a known secret leak into sanitized output.
+Config filters like `allow.paths` apply to `scan()`, git scanning, **and** `sanitize()`, because an allowlisted path is treated as genuinely not sensitive. Routing baselines through the same path would have let a triaged-but-real secret stop being redacted, and reach sanitized output.
 
 Keeping `--baseline` CLI-only avoids that trap.

@@ -1,0 +1,25 @@
+// What this catches: dependency lock files being reported as secrets.
+//
+// A lock file is almost entirely base64 integrity hashes, which entropy cannot
+// distinguish from a credential.
+
+cloud.google.com/go v0.26.0/go.mod h1:bEZ+4auHduMQgrztzcIgi59RmFzNzenejcrNbwbPasM==
+cloud.google.com/go v0.26.0 h1:BsjNGjkJ5Kz+njF5J8b6YBqZ/i6Fs0VikkpESM9fCUs==
+cloud.google.com/go v1.4.0/go.mod h1:umpBDue2ejQUNOYdgfdXwpvKmqLc3TdxkfQ4aelGBy0==
+cloud.google.com/go v1.4.0 h1:2qWCF1ThiXuZhCamrcZn4g3jAq7BFfmDW8FQun8ZBQU==
+github.com/pkg/errors v0.26.0/go.mod h1:CQb2ACUwull2iQH7AzJ+CzQzK2ReDFi7wbedvqtSjJ0==
+github.com/pkg/errors v0.26.0 h1:Y0Mj1+Go7ndLdIx853RXZJbmdS54OLbbNfpT7IJhcbA==
+github.com/pkg/errors v1.4.0/go.mod h1:xvl8AXKrieE6mRpNudNSKX2Hbil8PAuycYFyz9IQD/Y==
+github.com/pkg/errors v1.4.0 h1:JQsDvMq2U61OmUG+hmL4Dg3XdKDGpdcdQIr/IgKAK0M==
+golang.org/x/crypto v0.26.0/go.mod h1:ZpB40/oAJJ11MGqQh3LGAqKIOXjKLTMAXIZ+/HWyQHI==
+golang.org/x/crypto v0.26.0 h1:nvPwPX4ujaUvqwc+ED95fKGGKr2qV/1dLXecu3ufGXo==
+golang.org/x/crypto v1.4.0/go.mod h1:H6oSrBMcspeUc5IaO4B0n4wUFa8F7hkGCGT9gTa4MVQ==
+golang.org/x/crypto v1.4.0 h1:uIh2LVlshgMyJzfT3jgOYYs58NtXAJbUnV1nOKAyJcU==
+github.com/spf13/cobra v0.26.0/go.mod h1:AGd4djVzEN0NAcOtkgZbMIPkT+5GdctPYQF34of+yS0==
+github.com/spf13/cobra v0.26.0 h1:qCuYgf8moGKNUvxExnolJ3RkcLRLYSsjgsvM5GXNhlw==
+github.com/spf13/cobra v1.4.0/go.mod h1:rN6ybtyswHOp9qzcm0d+zcy0ZqB8JFg/VAkVH8/irnk==
+github.com/spf13/cobra v1.4.0 h1:WI4COEyqsZAbPLXkd7Y5qEXLhMTkbVLxywLJ/yMUj2E==
+gopkg.in/yaml.v3 v0.26.0/go.mod h1:DPEHomKGrffx53PPGMKGdvByXw521XZLEapruPtfYEI==
+gopkg.in/yaml.v3 v0.26.0 h1:bMiwf/4SgREBNdT8d1VCRSz4oNHhU3dEdOWphkC8n/Y==
+gopkg.in/yaml.v3 v1.4.0/go.mod h1:pYqfFIHoLERNLnMzKVEjHVo4sDfnkF/oE1qxlyjMeY0==
+gopkg.in/yaml.v3 v1.4.0 h1:BEmpeds24ATv56rDwCso98JURDInIv+VJMRi/405znI==

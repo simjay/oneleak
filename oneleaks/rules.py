@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from importlib import resources
 from pathlib import Path
 
 import yaml
@@ -182,3 +183,14 @@ class RuleRegistry:
     def load_sources(self, sources) -> None:
         for source in sources:
             self.load_source(source)
+
+
+def load_builtin_entries(filename: str) -> tuple[dict, ...]:
+    """Read one of the shipped rule files in `oneleaks/builtin_rules/`.
+
+    Shared by secret_rules.py and pii_rules.py, which stay separate modules
+    because the two categories are configured differently, but which load
+    their files identically.
+    """
+    text = resources.files("oneleaks.builtin_rules").joinpath(filename).read_text(encoding="utf-8")
+    return tuple(parse_yaml_rules(text, source=f"builtin:{filename}"))

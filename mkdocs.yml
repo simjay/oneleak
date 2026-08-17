@@ -32,6 +32,20 @@ theme:
 
 plugins:
   - search
+  # Docs moved into folders. These keep every already-published URL working,
+  # e.g. /en/latest/mcp/ still lands on the MCP page.
+  - redirects:
+      redirect_maps:
+        quickstart.md: getting-started/quickstart.md
+        configuration.md: getting-started/configuration.md
+        cli.md: guides/cli.md
+        rules.md: guides/rules.md
+        sanitization.md: guides/sanitization.md
+        mcp.md: guides/mcp.md
+        architecture.md: advanced/architecture.md
+        concepts.md: advanced/concepts.md
+        api.md: reference/api.md
+        changelog.md: reference/changelog.md
   - mkdocstrings:
       handlers:
         python:
@@ -63,16 +77,16 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
-      - Quickstart: quickstart.md
-      - Configuration: configuration.md
+      - Quickstart: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
   - Guides:
-      - CLI Reference: cli.md
-      - Custom Rules: rules.md
-      - Sanitization: sanitization.md
-      - MCP Server: mcp.md
+      - CLI Reference: guides/cli.md
+      - Custom Rules: guides/rules.md
+      - Sanitization: guides/sanitization.md
+      - MCP Server: guides/mcp.md
   - Advanced:
-      - How Scanning & Sanitization Work: architecture.md
-      - Concepts: concepts.md
+      - How Scanning & Sanitization Work: advanced/architecture.md
+      - Concepts: advanced/concepts.md
   - Reference:
-      - API Reference: api.md
-      - Changelog: changelog.md
+      - API Reference: reference/api.md
+      - Changelog: reference/changelog.md

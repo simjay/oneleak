@@ -1,6 +1,8 @@
 # Sanitization
 
-`sanitize()` reuses `scan()`'s findings, so it redacts secrets and PII in the same call. There's no second detection system to keep in sync, and no separate pass for each category.
+`sanitize()` reuses whatever `scan()` found, so it redacts secrets and PII in
+the same call. There is no second detector to keep in step, and
+no separate pass for each kind.
 
 ## Typed, numbered placeholders
 
@@ -14,7 +16,8 @@ print(oneleaks.sanitize(text).text)
 Email <EMAIL_1> using key <OPENAI_API_KEY_1>. Contact <EMAIL_1> again.
 ```
 
-One call, two categories: the key is a secret, the address is PII, and both are redacted together.
+One call, two kinds: the key is a secret, the address is PII, and both
+are redacted together.
 
 Two more things are happening:
 
@@ -72,5 +75,5 @@ A value appearing in both outputs now reuses the same placeholder.
 ## Algorithm notes
 
 - Replacements run **right to left**, by descending start offset, so earlier replacements don't invalidate later offsets.
-- Overlapping findings are resolved *before* replacement. See [overlap resolution](architecture.md#4-overlap-resolution).
+- Overlapping findings are resolved *before* replacement. See [overlap resolution](../advanced/architecture.md#4-overlap-resolution).
 - `desanitize()` is a plain per-placeholder string replace. Placeholders missing from the input, or placeholder-shaped tokens missing from the mapping, are left alone rather than raising. Sanitized text often round-trips through a model that will not echo every placeholder verbatim.

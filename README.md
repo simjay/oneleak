@@ -22,6 +22,11 @@ $ oneleaks scan .
 
 Every finding carries a `category` of `secret`, `pii`, or `sensitive`, so you can still route or filter them separately.
 
+```bash
+oneleaks scan . --category secret     # credentials only
+oneleaks scan . --category pii        # personal data only
+```
+
 ```python
 secrets = [f for f in result.findings if f.category == "secret"]
 pii     = [f for f in result.findings if f.category == "pii"]
@@ -93,7 +98,10 @@ oneleaks scan --changed
 oneleaks scan --staged
 oneleaks scan --history
 oneleaks scan . --json
-oneleaks scan . --fail-on high
+oneleaks scan . --sarif results.sarif      # for GitHub code scanning
+oneleaks scan . --category secret          # secret | pii | sensitive
+oneleaks scan . --severity high            # filters output, unlike --fail-on
+oneleaks scan . --fail-on high             # exit code only
 
 # adopting oneleaks on a repo that already has findings: baseline them, fail only on new ones
 oneleaks scan . --baseline .oneleaks-baseline.json --update-baseline
@@ -106,13 +114,38 @@ oneleaks desanitize sanitized.txt --map mapping.json
 
 Exit codes: `0` clean, `1` findings detected, `2` execution/configuration error.
 
+## Pre-commit hook
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/simjay/oneleaks
+    rev: v0.1.0
+    hooks:
+      - id: oneleaks          # staged content
+      # - id: oneleaks-files  # the files this commit touches
+      # - id: oneleaks-push   # working tree, on pre-push
+```
+
+## GitHub Actions
+
+```yaml
+- uses: simjay/oneleaks@v0.1.0
+  with:
+    args: "."
+    sarif-file: results.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
+
 ## MCP server
 
 ```bash
 oneleaks-mcp
 ```
 
-Exposes `scan_text`, `scan_path`, `sanitize_text`, `desanitize_text` as MCP tools over stdio, for agent runtimes to call directly. See [docs/mcp.md](https://oneleaks.readthedocs.io/en/latest/mcp/).
+Exposes `scan_text`, `scan_path`, `sanitize_text`, `desanitize_text` as MCP tools over stdio, for agent runtimes to call directly. See [docs/guides/mcp.md](https://oneleaks.readthedocs.io/en/latest/guides/mcp/).
 
 ## Config
 

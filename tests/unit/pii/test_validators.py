@@ -1,3 +1,5 @@
+import pytest
+
 from oneleaks import validators
 
 
@@ -104,3 +106,79 @@ class TestJWT:
 
     def test_header_not_json(self):
         assert not validators.jwt("bm90anNvbg.payload.signature")
+
+
+class TestCreditCard:
+    """Luhn alone accepts roughly one digit run in ten, so the issuer prefix
+    is what separates a card from a number that merely checksums.
+    """
+
+    def test_visa(self):
+        assert validators.credit_card("4111111111111111")
+
+    def test_mastercard(self):
+        assert validators.credit_card("5555555555554444")
+
+    def test_mastercard_2_series(self):
+        assert validators.credit_card("2223003122003222")
+
+    def test_amex(self):
+        assert validators.credit_card("378282246310005")
+
+    def test_discover(self):
+        assert validators.credit_card("6011111111111117")
+
+    def test_jcb(self):
+        assert validators.credit_card("3530111333300000")
+
+    def test_diners(self):
+        assert validators.credit_card("30569309025904")
+
+    def test_rejects_bad_checksum(self):
+        assert not validators.credit_card("4111111111111112")
+
+    def test_rejects_go_pseudo_version_timestamp(self):
+        # From `golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529`, which
+        # is Luhn-valid by chance and used to be reported as a `high` card.
+        assert validators.luhn("20190510104115")
+        assert not validators.credit_card("20190510104115")
+
+    def test_rejects_valid_checksum_at_wrong_length_for_issuer(self):
+        # Amex prefix, but 16 digits instead of 15.
+        assert validators.luhn("3782822463100052")
+        assert not validators.credit_card("3782822463100052")
+
+    def test_rejects_unknown_issuer_prefix(self):
+        assert validators.luhn("9999999999999995")
+        assert not validators.credit_card("9999999999999995")
+
+
+class TestPublicIPValidators:
+    """The built-in PII rules use these rather than plain parsing. An address
+    that cannot leave the machine or the local network identifies nobody.
+    """
+
+    def test_public_v4_accepted(self):
+        assert validators.public_ipv4("8.8.8.8")
+
+    def test_public_v6_accepted(self):
+        assert validators.public_ipv6("2606:4700:4700::1111")
+
+    @pytest.mark.parametrize(
+        "address",
+        ["127.0.0.1", "0.0.0.0", "10.0.0.5", "192.168.1.1", "172.16.0.1", "169.254.1.1"],
+    )
+    def test_non_routable_v4_rejected(self, address):
+        assert not validators.public_ipv4(address)
+
+    def test_documentation_ranges_rejected(self):
+        # RFC 5737 and RFC 3849 exist so docs can show an address safely.
+        assert not validators.public_ipv4("192.0.2.44")
+        assert not validators.public_ipv4("198.51.100.7")
+        assert not validators.public_ipv4("203.0.113.9")
+        assert not validators.public_ipv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+
+    def test_plain_validators_still_accept_everything(self):
+        # Unchanged, so a custom rule asking for "is this an IP" keeps working.
+        assert validators.ipv4("127.0.0.1")
+        assert validators.ipv6("2001:db8::1")

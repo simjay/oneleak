@@ -1,0 +1,29 @@
+# Consumed by other repositories, not by this one. Point pre-commit at
+# `repo: https://github.com/simjay/oneleaks` and pick a hook below.
+- id: oneleaks
+  name: oneleaks (staged content)
+  description: Scan staged changes for secrets and PII before they are committed.
+  entry: oneleaks scan --staged
+  language: python
+  # --staged reads the index itself, so pre-commit must not also pass paths.
+  pass_filenames: false
+  # Content, not code: run once per commit regardless of which files changed.
+  always_run: true
+  stages: [pre-commit]
+
+- id: oneleaks-files
+  name: oneleaks (changed files)
+  description: Scan the files this commit touches, as files on disk.
+  entry: oneleaks scan
+  language: python
+  pass_filenames: true
+  stages: [pre-commit]
+
+- id: oneleaks-push
+  name: oneleaks (working tree)
+  description: Scan tracked changes and untracked files before pushing.
+  entry: oneleaks scan --changed
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-push]

@@ -5,8 +5,11 @@ PY := oneleaks tests scripts
 # never checks the installed mkdocs version). It's red-on-stderr and reads
 # like a build error in CI logs, but says nothing about this project. Our
 # actual response to MkDocs 2.0 is the `mkdocs<2.0` pin in pyproject.toml.
-# NO_MKDOCS_2_WARNING is the opt-out that same file provides.
+# The opt-out variable has been renamed once already, and the warning now comes
+# from the `properdocs` package rather than mkdocs itself. Both names are set so
+# the build stays quiet across versions.
 export NO_MKDOCS_2_WARNING := true
+export DISABLE_MKDOCS_2_WARNING := true
 
 .PHONY: install format lint test bench build publish publish-test \
         docs-serve docs-build docs-deploy clean ci

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import yaml
@@ -23,6 +23,12 @@ _KNOWN_TOP_LEVEL_KEYS = {
 
 _KNOWN_SEVERITIES = {s.value for s in Severity}
 
+# The only schema this build understands. A config claiming a different one was
+# written for a oneleaks that reads fields differently, so running it under
+# these rules would apply settings the author never asked for. Baseline files
+# are checked the same way, in baseline.py.
+CONFIG_VERSION = 1
+
 
 @dataclass
 class Config:
@@ -38,12 +44,26 @@ class Config:
     allow_paths: list[str] = field(default_factory=list)
     disabled_rules: list[str] = field(default_factory=list)
     severity_overrides: dict[str, str] = field(default_factory=dict)
+    root: Path | None = None
+    """The folder this config file was read from.
+
+    `exclude` and `allow.paths` are written relative to the config file, so a
+    scan starting further down needs this to adjust them. `None` for a config
+    built in code, whose patterns are then taken as relative to the scan root.
+    """
 
 
 def _validate_top_level(data: dict, source: str) -> None:
     unknown = set(data) - _KNOWN_TOP_LEVEL_KEYS
     if unknown:
         raise ConfigError(f"{source}: unknown config field(s): {', '.join(sorted(unknown))}")
+
+    version = data.get("version", CONFIG_VERSION)
+    if version != CONFIG_VERSION:
+        raise ConfigError(
+            f"{source}: unsupported config version {version!r} "
+            f"(this build understands version {CONFIG_VERSION})"
+        )
 
 
 def _require_list_of_str(value, field_name: str, source: str) -> list:
@@ -122,18 +142,84 @@ def parse_config(text: str, source: str = "<config>") -> Config:
 
 def load_config(path: str | Path) -> Config:
     text = read_text_file(path, what="config file")
-    return parse_config(text, source=str(path))
+    cfg = parse_config(text, source=str(path))
+    cfg.root = Path(path).resolve().parent
+    return cfg
 
 
 DEFAULT_CONFIG_FILENAME = ".oneleaks.yaml"
 
 
 def discover_config(start: Path | None = None) -> Config | None:
-    """Look for `.oneleaks.yaml` in `start` (default: cwd). Used by the CLI only.
-    The Python API never auto-loads config, to keep library calls side-effect-free.
+    """Look for `.oneleaks.yaml` in `start` (default: cwd), then each parent
+    directory up to the filesystem root. Used by the CLI and MCP server only.
+    The Python API never auto-loads config, to keep library calls
+    side-effect-free.
+
+    Walking up matters because the config almost always sits at the project
+    root while the scan is often launched from somewhere below it: a
+    pre-commit hook, an editor integration, or just `cd src && oneleaks scan`.
+    Checking only the starting directory made every one of those silently
+    ignore the project's excludes, allow-paths and disabled rules.
     """
-    base = start or Path.cwd()
-    candidate = base / DEFAULT_CONFIG_FILENAME
-    if candidate.is_file():
-        return load_config(candidate)
+    base = (start or Path.cwd()).resolve()
+    for directory in (base, *base.parents):
+        candidate = directory / DEFAULT_CONFIG_FILENAME
+        if candidate.is_file():
+            return load_config(candidate)
     return None
+
+
+# --- Adjusting path patterns when a scan starts in a subfolder ---
+
+_GLOB_CHARS = ("*", "?", "[")
+
+
+def _shorten_pattern(pattern: str, folders_below: tuple[str, ...]) -> str | None:
+    """Trim the leading folders off a pattern so it matches from the scan root.
+
+    A config in `project/` listing `src/vendor/**`, scanned from `project/src`,
+    needs the pattern to become `vendor/**`. `folders_below` is the path from
+    the config file down to the scan root, here `("src",)`.
+
+    Returns None when the pattern can never match here, which is known as soon
+    as a folder name disagrees. Trimming stops at the first `*`, since a `*` can
+    stand for any number of folders.
+
+    A pattern trimmed away entirely (`sub`, scanned from inside `sub`) named the
+    scan root itself, so everything under it is covered and the result is `**`.
+    Returning None there would silently drop the exclusion.
+    """
+    segments = pattern.split("/")
+    for folder in folders_below:
+        if not segments or any(ch in segments[0] for ch in _GLOB_CHARS):
+            break
+        if segments[0] != folder:
+            return None
+        segments = segments[1:]
+    return "/".join(segments) if segments else "**"
+
+
+def make_patterns_relative_to_scan_folder(cfg, base: Path):
+    """Rewrite the config's file patterns so they match from `base`.
+
+    Patterns in `.oneleaks.yaml` are relative to that file, but the scan may
+    start below it (`cd src && oneleaks scan .`), and reported paths then start
+    at `src`. Without this the two are anchored differently and never match.
+
+    A no-op for a config built in code, or when the scan root is the config's
+    own folder.
+    """
+    if cfg.root is None:
+        return cfg
+    try:
+        folders_below = base.resolve().relative_to(cfg.root).parts
+    except ValueError:
+        return cfg  # scan root is outside the config's tree; leave as written
+    if not folders_below:
+        return cfg
+    return replace(
+        cfg,
+        exclude=[p for p in (_shorten_pattern(x, folders_below) for x in cfg.exclude) if p],
+        allow_paths=[p for p in (_shorten_pattern(x, folders_below) for x in cfg.allow_paths) if p],
+    )

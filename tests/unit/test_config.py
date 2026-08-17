@@ -109,3 +109,48 @@ class TestDiscoverConfig:
         cfg = discover_config(tmp_path)
         assert cfg is not None
         assert cfg.exclude == ["foo/**"]
+
+    def test_found_in_a_parent_directory(self, tmp_path):
+        # The config sits at the project root, but scans are often launched
+        # from below it: a pre-commit hook, an editor, or `cd src && scan`.
+        (tmp_path / ".oneleaks.yaml").write_text("exclude:\n  - foo/**\n")
+        nested = tmp_path / "src" / "deep"
+        nested.mkdir(parents=True)
+        cfg = discover_config(nested)
+        assert cfg is not None
+        assert cfg.exclude == ["foo/**"]
+
+    def test_records_the_directory_it_was_loaded_from(self, tmp_path):
+        (tmp_path / ".oneleaks.yaml").write_text("exclude:\n  - foo/**\n")
+        cfg = discover_config(tmp_path)
+        assert cfg is not None and cfg.root == tmp_path.resolve()
+
+    def test_nearest_config_wins(self, tmp_path):
+        (tmp_path / ".oneleaks.yaml").write_text("exclude:\n  - outer/**\n")
+        nested = tmp_path / "inner"
+        nested.mkdir()
+        (nested / ".oneleaks.yaml").write_text("exclude:\n  - inner/**\n")
+        cfg = discover_config(nested)
+        assert cfg is not None and cfg.exclude == ["inner/**"]
+
+
+class TestConfigVersion:
+    """A config claiming a version this build does not know was written for a
+    oneleaks that reads fields differently. Running it anyway would apply
+    settings the author never asked for. Baseline files are checked the same
+    way; this closes the same gap on the config side.
+    """
+
+    def test_current_version_is_accepted(self):
+        assert parse_config("version: 1\nexclude: []\n").version == 1
+
+    def test_missing_version_defaults_to_current(self):
+        assert parse_config("exclude: []\n").version == 1
+
+    def test_future_version_is_rejected(self):
+        with pytest.raises(ConfigError, match="unsupported config version"):
+            parse_config("version: 99\n")
+
+    def test_version_as_a_string_is_rejected(self):
+        with pytest.raises(ConfigError, match="unsupported config version"):
+            parse_config('version: "1"\n')

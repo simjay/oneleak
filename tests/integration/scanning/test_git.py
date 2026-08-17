@@ -2,6 +2,7 @@ import subprocess
 
 import pytest
 
+import oneleaks
 from oneleaks import git
 from oneleaks.config import Config
 
@@ -130,3 +131,34 @@ class TestScanHistory:
         cfg = Config(disabled_rules=["openai-api-key"])
         result = git.scan_history(cwd=str(repo), config=cfg)
         assert result.safe
+
+
+class TestGitScanningReadsTheSameEncodings:
+    """Git scanning used to have its own UTF-8-only decoder, so a UTF-16 file
+    was reported by `scan(Path(...))` and silently skipped by `--staged`.
+    """
+
+    SECRET = 'key = "sk-proj-' + "a" * 24 + '"\n'
+
+    @staticmethod
+    def _stage(repo):
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+
+    def test_utf16_file_is_found_when_staged(self, repo):
+        (repo / "script.ps1").write_bytes(self.SECRET.encode("utf-16"))
+        self._stage(repo)
+        result = git.scan_staged(cwd=str(repo))
+        assert "openai-api-key" in [f.rule_id for f in result.findings]
+
+    def test_folder_scan_and_staged_scan_agree(self, repo):
+        (repo / "utf8.txt").write_text(self.SECRET)
+        (repo / "utf16.ps1").write_bytes(self.SECRET.encode("utf-16"))
+        self._stage(repo)
+        staged = git.scan_staged(cwd=str(repo))
+        folder = oneleaks.scan(repo)
+        assert len(staged.findings) == len(folder.findings) == 2
+
+    def test_binary_is_still_skipped(self, repo):
+        (repo / "blob.bin").write_bytes(b"\x00\x01\x02\x03" * 64)
+        self._stage(repo)
+        assert git.scan_staged(cwd=str(repo)).findings == []

@@ -39,7 +39,7 @@ result = oneleaks.scan(text, rules=["company-rules.yaml"])
 | `severity` | yes | `low`, `medium`, `high`, or `critical`. |
 | `pattern` | one of these two | Regex. See the named-group tip below. |
 | `keywords` | one of these two | Words that must appear nearby for a match to count. |
-| `validator` | optional | `luhn`, `iban`, `ssn`, `ipv4`, `ipv6`, `jwt`, or `aba_routing`. |
+| `validator` | optional | `luhn`, `credit_card`, `iban`, `ssn`, `ipv4`, `ipv6`, `public_ipv4`, `public_ipv6`, `jwt`, or `aba_routing`. |
 | `priority` | optional | Overlap-resolution tier. Higher wins a contested span. |
 
 !!! tip "Capture just part of a match with a `value` group"
@@ -48,7 +48,7 @@ result = oneleaks.scan(text, rules=["company-rules.yaml"])
 
     That's how `connection-string-credential` flags only the password inside a URL, rather than the entire connection string.
 
-**Priority defaults:** 80 with a pattern, 60 for keyword-only. For context, built-in rules use 90–110, generic assignment uses 50, and entropy uses 10. See [overlap resolution](architecture.md#4-overlap-resolution).
+**Priority defaults:** 80 with a pattern, 60 for keyword-only. For context, built-in rules use 90-110, generic assignment uses 50, and entropy uses 10. See [overlap resolution](../advanced/architecture.md#4-overlap-resolution).
 
 **Keywords** must appear within roughly 60 characters before the match, on the same line. They reduce false positives on generic patterns. They do not make matching faster.
 
@@ -110,8 +110,8 @@ TOKEN = "fake-secret"  # oneleaks: allow generic-secret
 
 Bare `allow` suppresses every rule on that line. Adding a rule ID scopes it to just that rule, so anything else on the line still reports.
 
-For path- and rule-level exemptions, see [Configuration](configuration.md).
+For path- and rule-level exemptions, see [Configuration](../getting-started/configuration.md).
 
 ## Path scoping
 
-There is no per-rule `include_paths` or `exclude_paths`. Scoping is config-level only, through `exclude` and `allow.paths` in [Configuration](configuration.md#fields).
+There is no per-rule `include_paths` or `exclude_paths`. Scoping is config-level only, through `exclude` and `allow.paths` in [Configuration](../getting-started/configuration.md#fields).

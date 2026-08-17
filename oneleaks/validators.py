@@ -102,6 +102,52 @@ def luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
+# Issuer Identification Number ranges as (brand, low prefix, high prefix,
+# permitted lengths). The prefix is compared as an integer over the first
+# len(str(low)) digits, so ("mastercard", 51, 55, ...) tests digits[:2].
+#
+# Luhn alone is not enough: it accepts roughly one in ten random digit runs, so
+# timestamps and IDs pass it routinely. An issuer prefix at a brand-specific
+# length is what separates a card from a number that merely checksums.
+_CARD_ISSUERS: tuple[tuple[str, int, int, frozenset[int]], ...] = (
+    ("visa", 4, 4, frozenset({13, 16, 19})),
+    ("amex", 34, 34, frozenset({15})),
+    ("amex", 37, 37, frozenset({15})),
+    ("mastercard", 51, 55, frozenset({16})),
+    ("mastercard-2", 2221, 2720, frozenset({16})),
+    ("discover", 6011, 6011, frozenset({16, 19})),
+    ("discover", 644, 649, frozenset({16, 19})),
+    ("discover", 65, 65, frozenset({16, 19})),
+    ("jcb", 3528, 3589, frozenset({16, 17, 18, 19})),
+    ("diners", 300, 305, frozenset({14, 15, 16, 17, 18, 19})),
+    ("diners", 36, 36, frozenset({14, 15, 16, 17, 18, 19})),
+    ("diners", 38, 39, frozenset({14, 15, 16, 17, 18, 19})),
+    ("unionpay", 62, 62, frozenset({16, 17, 18, 19})),
+    ("maestro", 50, 50, frozenset({12, 13, 14, 15, 16, 17, 18, 19})),
+    ("maestro", 56, 58, frozenset({12, 13, 14, 15, 16, 17, 18, 19})),
+)
+
+
+def credit_card(value: str) -> bool:
+    """Luhn plus an issuer-prefix check. `value` must already be digits-only.
+
+    Luhn alone flags Go module pseudo-versions (`v0.0.0-20190510104115-...`),
+    ISO timestamps and similar digit runs, at `high` severity. Requiring a
+    known issuer prefix at a length that issuer actually uses removes those
+    without dropping any real card format.
+    """
+    if not luhn(value):
+        return False
+    length = len(value)
+    for _brand, low, high, lengths in _CARD_ISSUERS:
+        width = len(str(low))
+        if length < width:
+            continue
+        if low <= int(value[:width]) <= high and length in lengths:
+            return True
+    return False
+
+
 def iban(value: str) -> bool:
     """Format + country-length + Mod-97 checksum validation."""
     candidate = "".join(value.split()).upper()
@@ -117,9 +163,6 @@ def iban(value: str) -> bool:
     rearranged = candidate[4:] + candidate[:4]
     numeric = "".join(str(int(ch, 36)) for ch in rearranged)
     return int(numeric) % 97 == 1
-
-
-_SSN_RE_STRICT = None  # populated lazily to avoid import cost at module load
 
 
 def ssn(value: str) -> bool:
@@ -139,6 +182,9 @@ def ssn(value: str) -> bool:
 
 
 def ipv4(value: str) -> bool:
+    """Parses as an IPv4 address. Available to custom rules that want every
+    address; the built-in PII rule uses `public_ipv4` instead.
+    """
     try:
         ipaddress.IPv4Address(value)
         return True
@@ -147,9 +193,53 @@ def ipv4(value: str) -> bool:
 
 
 def ipv6(value: str) -> bool:
+    """Parses as an IPv6 address. See `ipv4` on why the built-in rule differs."""
     try:
         ipaddress.IPv6Address(value)
         return True
+    except ValueError:
+        return False
+
+
+# Ranges set aside for documentation and examples, which `ipaddress` has no
+# predicate for: RFC 5737 for v4, RFC 3849 for v6.
+_DOC_RANGES = tuple(
+    ipaddress.ip_network(n)
+    for n in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/32")
+)
+
+
+def _can_reach_the_internet(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Whether an address could identify a host on the public internet.
+
+    An address that cannot leave the machine or the local network identifies
+    nobody, so treating it as personal data is simply wrong. `127.0.0.1`,
+    `0.0.0.0` and the RFC 1918 private ranges appear in the configs, tests and
+    docs of essentially every repository: on three real projects these
+    accounted for the majority of all IP findings, and every one was noise.
+    """
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_reserved
+        or ip.is_unspecified
+        or ip.is_multicast
+        or ip.is_link_local
+    ):
+        return False
+    return not any(ip in network for network in _DOC_RANGES)
+
+
+def public_ipv4(value: str) -> bool:
+    try:
+        return _can_reach_the_internet(ipaddress.IPv4Address(value))
+    except ValueError:
+        return False
+
+
+def public_ipv6(value: str) -> bool:
+    try:
+        return _can_reach_the_internet(ipaddress.IPv6Address(value))
     except ValueError:
         return False
 
@@ -183,10 +273,13 @@ def jwt(value: str) -> bool:
 
 VALIDATORS = {
     "luhn": luhn,
+    "credit_card": credit_card,
     "iban": iban,
     "ssn": ssn,
     "ipv4": ipv4,
     "ipv6": ipv6,
+    "public_ipv4": public_ipv4,
+    "public_ipv6": public_ipv6,
     "jwt": jwt,
     "aba_routing": aba_routing,
 }

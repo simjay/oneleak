@@ -5,12 +5,8 @@ from __future__ import annotations
 import re
 
 from oneleaks.models import Finding, MappingEntry, SanitizedResult
-from oneleaks.scanner import (
-    build_registry,
-    resolve_config,
-    resolve_text_input,
-    scan_text_with_config,
-)
+from oneleaks.reading import resolve_text_input
+from oneleaks.scanner import build_registry, resolve_config, scan_text_with_config
 
 _PLACEHOLDER_RE = re.compile(r"^<(?P<type>[A-Z0-9_]+)_(?P<idx>\d+)>$")
 

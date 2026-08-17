@@ -11,21 +11,15 @@ they govern, not here.
 from __future__ import annotations
 
 from functools import lru_cache
-from importlib import resources
 
-from oneleaks.rules import parse_yaml_rules
+from oneleaks.rules import load_builtin_entries
 
 BUILTIN_FILENAME = "pii.yaml"
 
 
 @lru_cache(maxsize=1)
 def builtin_entries() -> tuple[dict, ...]:
-    text = (
-        resources.files("oneleaks.builtin_rules")
-        .joinpath(BUILTIN_FILENAME)
-        .read_text(encoding="utf-8")
-    )
-    return tuple(parse_yaml_rules(text, source=f"builtin:{BUILTIN_FILENAME}"))
+    return load_builtin_entries(BUILTIN_FILENAME)
 
 
 @lru_cache(maxsize=1)

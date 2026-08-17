@@ -1,49 +1,45 @@
-"""Scanning orchestration: candidate generation -> validation -> overlap resolution ->
-safe findings. This is where scan(text | bytes | Path) is implemented.
+"""Finding things: turning text into findings, and walking a folder to do it.
+
+The pipeline is candidates -> validation -> overlap resolution -> findings, and
+`scan(text | bytes | Path)` is the way in. What counts as a match lives in
+detectors.py and the rule files; what gets skipped lives in skip_rules.py;
+turning a match into something safe to show lives in findings.py.
 """
 
 from __future__ import annotations
 
-import fnmatch
-import hashlib
-import hmac
 import os
 import re
-import secrets
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from oneleaks import pii_rules
-from oneleaks.config import Config, load_config
+from oneleaks.config import (
+    Config,
+    load_config,
+    make_patterns_relative_to_scan_folder,
+)
 from oneleaks.detectors import (
     entropy_candidates,
     generic_assignment_candidates,
+    is_placeholder_credential,
     regex_candidates,
 )
 from oneleaks.errors import ScanError
+from oneleaks.findings import _compute_fingerprint, _safe_preview
 from oneleaks.models import Finding, Rule, ScanResult
+from oneleaks.reading import _decode_text, _matches_any, resolve_text_input
 from oneleaks.rules import ENTROPY_PRIORITY as _ENTROPY_PRIORITY
 from oneleaks.rules import GENERIC_ASSIGNMENT_PRIORITY as _GENERIC_PRIORITY
 from oneleaks.rules import RuleRegistry
+from oneleaks.skip_rules import (
+    DEFAULT_EXCLUDED_DIR_NAMES,
+    DEFAULT_MAX_FILE_SIZE,
+    GUESSING_RULE_IDS,
+    _public_certificate_ranges,
+    _rules_to_skip_for_file,
+)
 from oneleaks.validators import VALIDATORS
-
-DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-DEFAULT_EXCLUDED_DIR_NAMES = {
-    ".git",
-    "node_modules",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "dist",
-    "build",
-    # Local tool caches: never committed (all gitignored), but a directory
-    # scan walks the real filesystem regardless of git status, and test
-    # node IDs / cached artifacts in these can trip the entropy detector.
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".hypothesis",
-}
 
 _INLINE_ALLOW_RE = re.compile(r"#\s*oneleaks:\s*allow(?:\s+(?P<rule_id>[\w-]+))?", re.IGNORECASE)
 
@@ -86,82 +82,9 @@ def _line_span(text: str, start: int) -> tuple[int, int]:
 
 
 def _normalize_for_validator(validator_name: str, raw: str) -> str:
-    if validator_name == "luhn":
+    if validator_name in ("luhn", "credit_card"):
         return re.sub(r"[ -]", "", raw)
     return raw
-
-
-# --- Fingerprinting ---------------------------------------------------------------------------
-
-_SESSION_KEY: bytes | None = None
-_FINGERPRINT_PREFIX = {"secret": "sec", "pii": "pii", "sensitive": "sen"}
-
-
-def _fingerprint_key(explicit_key: bytes | None) -> bytes:
-    if explicit_key is not None:
-        return explicit_key
-    env = os.environ.get("ONELEAKS_FINGERPRINT_KEY")
-    if env:
-        return env.encode("utf-8")
-    global _SESSION_KEY
-    if _SESSION_KEY is None:
-        _SESSION_KEY = secrets.token_bytes(32)
-    return _SESSION_KEY
-
-
-def _compute_fingerprint(
-    rule_id: str, category: str, normalized_value: str, key: bytes | None = None
-) -> str:
-    digest = hmac.new(
-        _fingerprint_key(key),
-        f"{rule_id}:{normalized_value}".encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    prefix = _FINGERPRINT_PREFIX.get(category, "fnd")
-    return f"{prefix}_{digest[:16]}"
-
-
-# --- Safe preview -------------------------------------------------------------------------------
-
-
-def _safe_preview(type_: str, value: str) -> str:
-    if type_ in ("private_key", "pgp_private_key"):
-        return "<PRIVATE_KEY>"
-    if type_ == "email" and "@" in value:
-        local, _, domain = value.partition("@")
-        head = local[0] if local else ""
-        return f"{head}***@{domain}"
-    if type_ == "ssn":
-        digits = re.sub(r"\D", "", value)
-        if len(digits) == 9:
-            return f"***-**-{digits[5:]}"
-    if type_ == "credit_card":
-        digits = re.sub(r"\D", "", value)
-        if len(digits) >= 4:
-            return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
-    if len(value) <= 6:
-        return "*" * len(value)
-    return f"{value[:4]}****{value[-3:]}"
-
-
-def finding_to_dict(f: Finding) -> dict:
-    """JSON-serializable shape for a Finding. Shared by the CLI's --json
-    output and the MCP server's tool results, so both surfaces stay in sync.
-    """
-    return {
-        "rule_id": f.rule_id,
-        "category": f.category,
-        "type": f.type,
-        "severity": f.severity,
-        "path": f.path,
-        "line": f.line,
-        "column": f.column,
-        "start": f.start,
-        "end": f.end,
-        "preview": f.preview,
-        "fingerprint": f.fingerprint,
-        "commit": f.commit,
-    }
 
 
 # --- Candidate generation + overlap resolution -------------------------------------------------
@@ -179,6 +102,8 @@ def _generate_candidates(text: str, registry: RuleRegistry) -> list[_Candidate]:
                     _normalize_for_validator(rule.validator, raw)
                 ):
                     continue
+            if rule.category == "secret" and is_placeholder_credential(raw):
+                continue
             candidates.append(_Candidate(rule=rule, start=match.start, end=match.end))
 
     for match in generic_assignment_candidates(text):
@@ -236,13 +161,17 @@ def scan_text(
 ) -> list[Finding]:
     candidates = _generate_candidates(text, registry)
     candidates = [c for c in candidates if c.rule.id not in disabled_rules]
-    # Suppress before resolving overlaps: a rule-scoped `# oneleaks: allow <id>`
-    # must only remove that one rule's candidate, leaving any other
-    # (non-allow-listed, lower-priority) rule that matches the same span free
-    # to win the overlap and still be reported. Suppressing after overlap
-    # resolution would instead silently drop the whole span whenever the
-    # *winning* candidate happened to be the suppressed one.
+    # Before overlap resolution, not after: a rule-scoped
+    # `# oneleaks: allow <id>` must remove only that rule's candidate, leaving
+    # any lower-priority rule on the same span free to win and still report.
     candidates = [c for c in candidates if not _is_suppressed(text, c)]
+    if pem_spans := _public_certificate_ranges(text):
+        candidates = [
+            c
+            for c in candidates
+            if c.rule.id not in GUESSING_RULE_IDS
+            or not any(start <= c.start and c.end <= end for start, end in pem_spans)
+        ]
     candidates = _resolve_overlaps(candidates)
 
     findings: list[Finding] = []
@@ -268,17 +197,6 @@ def scan_text(
     return findings
 
 
-# --- Path / directory scanning -------------------------------------------------------------------
-
-
-def _is_probably_binary(data: bytes) -> bool:
-    return b"\x00" in data[:8192]
-
-
-def _matches_any(relative_posix: str, patterns: tuple[str, ...]) -> bool:
-    return any(fnmatch.fnmatch(relative_posix, pattern) for pattern in patterns)
-
-
 def _scan_file(
     path: Path,
     registry: RuleRegistry,
@@ -298,11 +216,8 @@ def _scan_file(
         data = path.read_bytes()
     except OSError as exc:
         raise ScanError(f"cannot read {path}: {exc}") from exc
-    if _is_probably_binary(data):
-        return []
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
+    text = _decode_text(data)
+    if text is None:
         return []
 
     try:
@@ -314,7 +229,7 @@ def _scan_file(
         registry,
         path=rel,
         fingerprint_key=fingerprint_key,
-        disabled_rules=disabled_rules,
+        disabled_rules=_rules_to_skip_for_file(rel, disabled_rules),
     )
 
 
@@ -369,46 +284,6 @@ def scan_path(
 
 
 # --- Public entry point --------------------------------------------------------------------------
-
-
-def resolve_text_input(content, *, skip_unreadable: bool = False) -> tuple[str | None, str | None]:
-    """Resolve str/bytes/single-file-Path input to (text, path). Directories
-    are not supported here, use scan_path() directly for those.
-
-    With skip_unreadable=True (used by scan(), to match directory-scan's
-    "skip binary files safely" default), a binary/undecodable file yields
-    (None, path) instead of raising. sanitize() uses skip_unreadable=False:
-    asking to sanitize a specific unreadable file is a real user-facing error.
-    """
-    if isinstance(content, Path):
-        if content.is_dir():
-            raise ScanError("this operation does not support directory input; pass a file or text")
-        data = content.read_bytes()
-        if _is_probably_binary(data):
-            if skip_unreadable:
-                return None, str(content)
-            raise ScanError(f"cannot process binary file: {content}")
-        try:
-            text = data.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            if skip_unreadable:
-                return None, str(content)
-            raise ScanError(f"cannot decode {content} as UTF-8") from exc
-        return text, str(content)
-    if isinstance(content, bytes):
-        if _is_probably_binary(content):
-            if skip_unreadable:
-                return None, None
-            raise ScanError("input looks binary, not text")
-        try:
-            return content.decode("utf-8"), None
-        except UnicodeDecodeError as exc:
-            if skip_unreadable:
-                return None, None
-            raise ScanError("input is not valid UTF-8") from exc
-    if isinstance(content, str):
-        return content, None
-    raise ScanError(f"unsupported input type: {type(content).__name__}")
 
 
 def build_registry(rules, cfg) -> RuleRegistry:
@@ -484,7 +359,7 @@ def scan_text_with_config(
         registry,
         path=path,
         fingerprint_key=fingerprint_key,
-        disabled_rules=_disabled_rule_ids(cfg),
+        disabled_rules=_rules_to_skip_for_file(path, _disabled_rule_ids(cfg)),
     )
     return _apply_config_filters(findings, cfg)
 
@@ -495,6 +370,7 @@ def scan(content, *, rules=None, config=None) -> ScanResult:
     registry = build_registry(rules, cfg)
 
     if isinstance(content, Path) and content.is_dir():
+        cfg = make_patterns_relative_to_scan_folder(cfg, content)
         findings = scan_path(
             content,
             registry,
@@ -503,6 +379,10 @@ def scan(content, *, rules=None, config=None) -> ScanResult:
         )
         findings = _apply_config_filters(findings, cfg)
     else:
+        # File and text targets report the path as given, so it is relative to
+        # the working directory rather than a scan root. Git scans need no
+        # equivalent: their paths are already repo-root-relative.
+        cfg = make_patterns_relative_to_scan_folder(cfg, Path.cwd())
         text, path = resolve_text_input(content, skip_unreadable=True)
         findings = [] if text is None else scan_text_with_config(text, registry, cfg, path=path)
 

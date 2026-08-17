@@ -6,9 +6,11 @@ import argparse
 import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 from oneleaks import __version__, git
+from oneleaks import sarif as sarif_output
 from oneleaks.baseline import (
     filter_new,
     load_baseline,
@@ -17,9 +19,10 @@ from oneleaks.baseline import (
 )
 from oneleaks.config import discover_config
 from oneleaks.errors import ConfigError, OneleaksError, read_text_file
-from oneleaks.models import Finding, MappingEntry, Severity, severity_rank
+from oneleaks.findings import finding_to_dict
+from oneleaks.models import Category, Finding, MappingEntry, Severity, severity_rank
 from oneleaks.sanitizer import desanitize, sanitize
-from oneleaks.scanner import finding_to_dict, scan
+from oneleaks.scanner import scan
 
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
@@ -39,7 +42,35 @@ def _print_findings_human(findings: list[Finding]) -> None:
         print(f"[{f.severity}] {f.rule_id} ({f.type}) at {location} -- {f.preview}")
 
 
-def _blocking(findings: list[Finding], fail_on: str | None) -> list[Finding]:
+def _print_summary(findings: list[Finding]) -> None:
+    """One line telling you how much of what you are looking at is serious."""
+    if not findings:
+        return
+    counts = Counter(f.severity for f in findings)
+    parts = [
+        f"{counts[name]} {name}"
+        for name in ("critical", "high", "medium", "low")
+        if counts.get(name)
+    ]
+    noun = "finding" if len(findings) == 1 else "findings"
+    print(f"\n{len(findings)} {noun}: {', '.join(parts)}")
+
+
+def _apply_filters(findings: list[Finding], categories: list[str] | None, severity: str | None):
+    """Narrow the reported set. Unlike `--fail-on`, which only moves the exit
+    code, these drop findings outright, so output, JSON and the exit code all
+    agree on what was reported.
+    """
+    if categories:
+        wanted = set(categories)
+        findings = [f for f in findings if f.category in wanted]
+    if severity is not None:
+        threshold = severity_rank(severity)
+        findings = [f for f in findings if severity_rank(f.severity) >= threshold]
+    return findings
+
+
+def _findings_that_fail_the_run(findings: list[Finding], fail_on: str | None) -> list[Finding]:
     if fail_on is None:
         return findings
     threshold = severity_rank(fail_on)
@@ -96,6 +127,8 @@ def cmd_scan(args: argparse.Namespace) -> int:
             write_baseline(args.baseline, findings)
         findings = filter_new(findings, load_baseline(args.baseline))
 
+    findings = _apply_filters(findings, args.category, args.severity)
+
     if truncated:
         print(
             f"warning: history scan stopped at --max-commits {args.max_commits}; "
@@ -103,7 +136,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    blocking = _blocking(findings, args.fail_on)
+    blocking = _findings_that_fail_the_run(findings, args.fail_on)
 
     if args.json:
         risk = max((f.severity for f in blocking), key=severity_rank) if blocking else None
@@ -115,6 +148,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2))
     else:
         _print_findings_human(findings)
+        _print_summary(findings)
+
+    if args.sarif:
+        Path(args.sarif).write_text(sarif_output.dumps(findings, version=__version__))
 
     return EXIT_FINDINGS if blocking else EXIT_CLEAN
 
@@ -199,10 +236,18 @@ def build_parser() -> argparse.ArgumentParser:
     scan_p = subparsers.add_parser("scan", help="Scan text/files/directories for sensitive data")
     scan_p.add_argument("paths", nargs="*", help="Files, directories, or '-' for stdin")
     git_group = scan_p.add_mutually_exclusive_group()
-    git_group.add_argument("--changed", action="store_true", help="Scan git working-tree changes")
-    git_group.add_argument("--staged", action="store_true", help="Scan git staged (index) content")
     git_group.add_argument(
-        "--history", action="store_true", help="Scan git commit history (see --since/--max-commits)"
+        "--changed",
+        action="store_true",
+        help=("Scan the files you have changed but not committed yet"),
+    )
+    git_group.add_argument(
+        "--staged", action="store_true", help=("Scan the files you have staged with git add")
+    )
+    git_group.add_argument(
+        "--history",
+        action="store_true",
+        help=("Scan git commit history (see --since/--max-commits)"),
     )
     scan_p.add_argument(
         "--since",
@@ -213,30 +258,52 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-commits",
         type=int,
         default=5000,
-        help="With --history: commit cap, most recent first (0 = unlimited, default 5000)",
+        help=(
+            "With --history: how many commits to look at, newest first (0 means all, default 5000)"
+        ),
     )
     scan_p.add_argument(
         "--all-refs",
         action="store_true",
         help="With --history: scan all branches/tags, not just HEAD",
     )
-    scan_p.add_argument("--json", action="store_true", help="Emit JSON output")
+    scan_p.add_argument(
+        "--category",
+        action="append",
+        choices=[c.value for c in Category],
+        help="Only report this kind of finding. Can be given more than once. "
+        "This hides the others completely, so the exit code matches what you see",
+    )
+    scan_p.add_argument(
+        "--severity",
+        choices=[s.value for s in Severity],
+        help="Only report findings this severe or worse. This hides the others "
+        "completely, unlike --fail-on which still prints them",
+    )
+    scan_p.add_argument(
+        "--json", action="store_true", help=("Print the results as JSON instead of plain text")
+    )
+    scan_p.add_argument(
+        "--sarif",
+        metavar="PATH",
+        help="Also write a SARIF 2.1.0 report here, for GitHub code scanning",
+    )
     scan_p.add_argument(
         "--fail-on",
         choices=[s.value for s in Severity],
         default=None,
-        help="Only findings at or above this severity affect the exit code",
+        help="Still print everything, but only fail the run on findings this severe or worse",
     )
     scan_p.add_argument("--config", default=None, help="Path to .oneleaks.yaml")
     scan_p.add_argument(
         "--baseline",
         default=None,
-        help="Path to a baseline file; only findings not already in it are reported",
+        help="Path to a list of findings you have already reviewed; only new ones are reported",
     )
     scan_p.add_argument(
         "--update-baseline",
         action="store_true",
-        help="With --baseline: overwrite it with this run's findings",
+        help="With --baseline: replace that file with everything found in this run",
     )
     scan_p.set_defaults(func=cmd_scan)
 
@@ -244,7 +311,11 @@ def build_parser() -> argparse.ArgumentParser:
         "sanitize", help="Redact secrets/PII, writing the result to stdout"
     )
     sanitize_p.add_argument("path", help="File to sanitize, or '-' for stdin")
-    sanitize_p.add_argument("--map", default=None, help="Write a placeholder->value mapping file")
+    sanitize_p.add_argument(
+        "--map",
+        default=None,
+        help=("Save a file that maps each placeholder back to the original value"),
+    )
     sanitize_p.add_argument("--config", default=None, help="Path to .oneleaks.yaml")
     sanitize_p.set_defaults(func=cmd_sanitize)
 

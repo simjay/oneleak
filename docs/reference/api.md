@@ -31,7 +31,7 @@ oneleaks.git.scan_history(...)
 
 ## Configuration
 
-`Config` mirrors `.oneleaks.yaml` for callers who want to build one directly instead of loading a file. See [Configuration](configuration.md) for the YAML shape and field descriptions.
+`Config` mirrors `.oneleaks.yaml` for callers who want to build one directly instead of loading a file. See [Configuration](../getting-started/configuration.md) for the YAML shape and field descriptions.
 
 ::: oneleaks.config.Config
 

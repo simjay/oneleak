@@ -25,7 +25,7 @@ rules:
     category: pii
     type: email
     severity: low
-    pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    pattern: '(?:(?<=mailto:)|(?<!:))\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
     priority: 100
 
   - id: phone
@@ -48,7 +48,7 @@ rules:
     type: credit_card
     severity: high
     pattern: '\b(?:\d[ -]?){12,18}\d\b'
-    validator: luhn
+    validator: credit_card
     priority: 100
 
   - id: ipv4
@@ -56,7 +56,7 @@ rules:
     type: ipv4
     severity: low
     pattern: '\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b'
-    validator: ipv4
+    validator: public_ipv4
     priority: 80
 
   - id: ipv6
@@ -64,7 +64,7 @@ rules:
     type: ipv6
     severity: low
     pattern: '\b(?:[A-Fa-f0-9]{1,4}:){2,7}[A-Fa-f0-9:]{1,4}\b'
-    validator: ipv6
+    validator: public_ipv6
     priority: 80
 
   - id: iban

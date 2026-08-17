@@ -13,12 +13,8 @@ from pathlib import Path
 
 from oneleaks.errors import ScanError
 from oneleaks.models import ScanResult
-from oneleaks.scanner import (
-    _is_probably_binary,
-    build_registry,
-    resolve_config,
-    scan_text_with_config,
-)
+from oneleaks.reading import _decode_text
+from oneleaks.scanner import build_registry, resolve_config, scan_text_with_config
 
 # The well-known SHA1 of git's empty tree object, used as the "parent" of a
 # root commit (which has no real parent to diff against).
@@ -123,15 +119,6 @@ def _read_staged_blob(path: str, cwd: str | None = None) -> bytes | None:
     return result.stdout
 
 
-def _decode(data: bytes) -> str | None:
-    if _is_probably_binary(data):
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-
-
 def _scan_files(
     paths: list[str],
     reader,
@@ -147,7 +134,7 @@ def _scan_files(
         data = reader(path, cwd)
         if data is None:
             continue
-        text = _decode(data)
+        text = _decode_text(data)
         if text is None:
             continue
         findings.extend(scan_text_with_config(text, registry, cfg, path=path))

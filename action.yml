@@ -1,0 +1,53 @@
+name: oneleaks
+description: Scan a repository for secrets and PII, with optional SARIF upload.
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  args:
+    description: Arguments passed to `oneleaks scan`.
+    required: false
+    default: "."
+  version:
+    description: Version of oneleaks to install, e.g. "0.1.0". Defaults to latest.
+    required: false
+    default: ""
+  sarif-file:
+    description: Write SARIF here. Leave empty to skip SARIF output.
+    required: false
+    default: ""
+  fail-on:
+    description: Minimum severity that fails the job. Empty means any finding fails.
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: "0 clean, 1 findings, 2 error."
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install oneleaks
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          python3 -m pip install --quiet "oneleaks==${{ inputs.version }}"
+        else
+          python3 -m pip install --quiet oneleaks
+        fi
+
+    - name: Scan
+      id: scan
+      shell: bash
+      run: |
+        set +e
+        extra=""
+        [ -n "${{ inputs.fail-on }}" ] && extra="--fail-on ${{ inputs.fail-on }}"
+        [ -n "${{ inputs.sarif-file }}" ] && extra="$extra --sarif ${{ inputs.sarif-file }}"
+        oneleaks scan ${{ inputs.args }} $extra
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit $code

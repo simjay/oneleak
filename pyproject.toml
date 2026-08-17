@@ -52,6 +52,8 @@ docs = [
     "mkdocs>=1.6,<2.0",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.26",
+    # Keeps the pre-folder doc URLs working after the move.
+    "mkdocs-redirects>=1.2",
 ]
 mcp = [
     # Pinned below 2.0: the official SDK's v2.0 beta renames FastMCP to
@@ -84,6 +86,15 @@ dev = [
 testpaths = ["tests"]
 
 [tool.ruff]
+# The files in tests/integration/false_positives/clean_files/ are copies of
+# real-world files, kept exactly as they were found. Some of them contain code
+# that does not lint. They are test data, not maintained source.
+extend-exclude = ["tests/integration/false_positives/clean_files"]
+# Required for the exclusion to hold under pre-commit. Ruff ignores exclusions
+# for files named explicitly on the command line, and pre-commit always names
+# the changed files explicitly. Without this, `make lint` passes (it scans
+# directories) while the identical check fails in the hook.
+force-exclude = true
 line-length = 100
 target-version = "py311"
 

@@ -60,7 +60,7 @@ oneleaks.scan(Path("."))             # whole tree
 
     Wrap filesystem input in `Path(...)`. Guessing whether a string is a path or a payload would silently read files when you meant to scan text.
 
-Binary files and anything over 10 MB are skipped. Common noise directories like `.git/`, `node_modules/`, and `.venv/` are excluded automatically. The full list is in [Configuration](configuration.md#fields).
+Binary files and anything over 10 MB are skipped. Common noise directories like `.git/`, `node_modules/`, and `.venv/` are excluded automatically, and lockfiles are exempted from the two shape-only detectors. The full list is in [Configuration](configuration.md#fields).
 
 ## Sanitizing
 
@@ -78,7 +78,7 @@ Two things to notice:
 - **Placeholders are typed**, so the redacted text still says what *kind* of value was there.
 - **A repeated value reuses its placeholder**, so the text stays coherent.
 
-To recover the originals later, see the reversible-mapping workflow in [Sanitization](sanitization.md).
+To recover the originals later, see the reversible-mapping workflow in [Sanitization](../guides/sanitization.md).
 
 ## Scanning git
 
@@ -94,8 +94,8 @@ oneleaks.git.scan_history()  # commits, including secrets since removed
 
 ## Next steps
 
-- [CLI Reference](cli.md): every command and flag
+- [CLI Reference](../guides/cli.md): every command and flag
 - [Configuration](configuration.md): `.oneleaks.yaml`
 - [Baselines](configuration.md#baselines): adopt oneleaks on a repo that already has findings
-- [Custom Rules](rules.md): extend detection without forking
-- [MCP Server](mcp.md): expose scan and sanitize to an agent
+- [Custom Rules](../guides/rules.md): extend detection without forking
+- [MCP Server](../guides/mcp.md): expose scan and sanitize to an agent

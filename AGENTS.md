@@ -49,13 +49,25 @@ oneleaks/               the package
   config.py                       .oneleaks.yaml loading, strict unknown-field rejection
   models.py                        Finding, ScanResult, Rule, etc.
   builtin_rules/*.yaml               declarative secret/PII rules
-tests/                  one test file per oneleaks/ module, plus test_properties.py (Hypothesis),
-                        plus test_e2e_cli.py/test_e2e_mcp.py (real subprocess/real stdio, see below)
-docs/                   published docs (mkdocs). docs/architecture.md explains the pipeline in detail
+tests/                  top level = how a test runs; see tests/README.md
+  unit/                   one function at a time, never calls scan()
+    secrets/                detectors (entropy, generic assignment)
+    pii/                    validators (luhn, IBAN, SSN, IP)
+  integration/            the whole scan, in one process
+    secrets/ pii/           does each rule find its format
+    scanning/ output/ commands/
+    false_positives/        clean_files/ plus the test that keeps them clean
+  e2e/                    the real program as a subprocess / real stdio
+  test_properties.py      generated inputs (Hypothesis)
+docs/                   published docs (mkdocs), grouped as the site nav is
+  getting-started/        quickstart, configuration
+  guides/                 cli, rules, sanitization, mcp
+  advanced/               architecture (the pipeline stage by stage), concepts
+  reference/              api, changelog
 scripts/benchmark.py    perf timing, not a test
 ```
 
-## Before changing detection logic, read `docs/architecture.md`
+## Before changing detection logic, read `docs/advanced/architecture.md`
 
 Two orderings in `scanner.py::scan_text()` are load-bearing, not arbitrary, and have each caused a real bug when gotten wrong before:
 
@@ -68,8 +80,8 @@ Also load-bearing: **every entry point that produces findings from a `Config` mu
 
 - **Never store or log a raw sensitive value** outside of `SanitizedResult.mapping` (only populated when the caller explicitly passes `reveal=True`) and mapping files written via `--map` (always `0600`, always with a "don't commit this" warning). `Finding` never carries a raw value, only `preview` (masked) and `fingerprint` (HMAC, one-way).
 - **Test fixtures use fake-but-realistic values only**, e.g. `"sk-proj-" + "a" * 20`, never a real or even expired/revoked credential. This is enforced by convention, not tooling. Don't break it.
-- **New built-in rule -> three tests**: positive (realistic match detected), negative (adjacent non-match isn't), boundary (off-by-one length/prefix). See `tests/test_scanner.py::TestProviderRules` for the pattern.
-- **Two test tiers, different jobs.** Everything except `test_e2e_*.py` calls into oneleaks's Python API/internal functions directly, fast and precise about which function is under test. `test_e2e_cli.py` spawns `oneleaks` as a real subprocess (`sys.executable -m oneleaks.cli`, not the installed console script, so it needs no PATH assumptions) and `test_e2e_mcp.py` spawns the MCP server and talks to it over real stdio via the `mcp` SDK's client transport. These exist to catch what only shows up crossing a real process boundary (entry-point/packaging breakage, exit codes, stdin/stdout/stderr framing, real git subprocess interaction) — they deliberately re-cover some of the same ground as the unit-level CLI/MCP tests, that overlap is the point, not a redundancy to clean up. Add a new unit-level test for a new flag/behavior; add to the e2e suite only when the thing being tested genuinely depends on crossing that boundary.
+- **New built-in rule -> three tests**: positive (realistic match detected), negative (adjacent non-match isn't), boundary (off-by-one length/prefix). See `tests/integration/secrets/test_secret_rules.py::TestProviderRules` for the pattern.
+- **Three test tiers, different jobs.** `tests/unit/` calls one function at a time and never runs a full scan. `tests/integration/` drives the whole pipeline in-process, which is where most tests live, including every rule-detection test. `tests/e2e/` crosses a real process boundary: `test_cli_subprocess.py` spawns `oneleaks` via `sys.executable -m oneleaks.cli` (not the installed console script, so it needs no PATH assumptions), and `test_mcp_stdio.py` starts the MCP server and talks to it over real stdio via the `mcp` SDK's client transport. The e2e tier exists to catch what only shows up crossing that boundary (entry-point/packaging breakage, exit codes, stdin/stdout/stderr framing, real git subprocess interaction) and deliberately re-covers ground the integration tier already covers — that overlap is the point, not redundancy to clean up. Add a new integration test for a new flag or behaviour; add to e2e only when the thing under test genuinely depends on crossing the boundary. See `tests/README.md`.
 - **Regex quantifiers on secret patterns must be bounded** (`{20,100}`, not `{20,}`). An unbounded quantifier let a match run away across trailing content with no separator. See the git history / CHANGELOG for the exact failure mode before "fixing" this differently.
 - **Declarative YAML/JSON rules never execute code. Python rules are never auto-loaded** from repo config, only from explicit `rules=[...]` in caller code. This is a security boundary, not a style choice. Don't add a mechanism that auto-discovers Python rule files from a repo.
 - **Simplicity over speculative flexibility.** This codebase has twice had a pass that found and removed fields/config options that were parsed but never consumed (`Rule.min_entropy`, `Config.sanitize`, etc.). Don't add a config knob or model field before something actually reads it.
@@ -84,8 +96,8 @@ uv run python -c "import oneleaks; r = oneleaks.scan('OPENAI_API_KEY=sk-proj-' +
 
 ## Docs
 
-- [docs/architecture.md](docs/architecture.md): the detection pipeline and sanitization algorithm, stage by stage
-- [docs/concepts.md](docs/concepts.md): the field knowledge behind the design, including why some competitor techniques were evaluated and not adopted
-- [docs/rules.md](docs/rules.md): rule schema, priority tiers
+- [docs/advanced/architecture.md](docs/advanced/architecture.md): the detection pipeline and sanitization algorithm, stage by stage
+- [docs/advanced/concepts.md](docs/advanced/concepts.md): the field knowledge behind the design, including why some competitor techniques were evaluated and not adopted
+- [docs/guides/rules.md](docs/guides/rules.md): rule schema, priority tiers
 - [CONTRIBUTING.md](CONTRIBUTING.md): human-oriented contribution guide
 - [CHANGELOG.md](CHANGELOG.md): what changed and why, including past bugs and their fixes

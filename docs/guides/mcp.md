@@ -64,7 +64,7 @@ Same as `scan_text`, but for a file or directory path. Mirrors `oneleaks scan <p
 
 ### `sanitize_text(content: str, reveal: bool = False) -> dict`
 
-Redacts secrets/PII with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API_KEY_1>`, ...):
+Redacts secrets and PII with typed, numbered placeholders (`<EMAIL_1>`, `<OPENAI_API_KEY_1>`, ...):
 
 ```json
 {"text": "email=<EMAIL_1>", "mapping": null}

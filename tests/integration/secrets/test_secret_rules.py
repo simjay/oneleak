@@ -1,14 +1,20 @@
-from pathlib import Path
-
-import pytest
+from helpers import rule_ids
 
 import oneleaks
-from oneleaks.config import Config
-from oneleaks.scanner import _disabled_rule_ids, build_registry
+from oneleaks import secret_rules
 
 
-def rule_ids(result):
-    return [f.rule_id for f in result.findings]
+class TestBuiltinEntries:
+    def test_loads_all_secret_rules(self):
+        entries = secret_rules.builtin_entries()
+        ids = {e["id"] for e in entries}
+        assert {"aws-access-key-id", "github-pat", "openai-api-key"} <= ids
+
+    def test_every_entry_is_secret_category(self):
+        assert all(e["category"] == "secret" for e in secret_rules.builtin_entries())
+
+
+# --- The rules find what they are meant to find ---
 
 
 class TestProviderRules:
@@ -450,6 +456,47 @@ class TestProviderRules:
         assert "facebook-access-token" not in rule_ids(result)
 
 
+# Prefix and body are kept apart on purpose. Written as one literal, these
+# fixtures trip GitHub's push protection, which blocks the push even though the
+# value is fake. Same reason as the Slack webhook fixture above: a secret
+# scanner's own fixtures have to dodge other secret scanners. Do not "simplify"
+# these into single strings.
+_STRIPE_BODY = "51OuEMLAlTWGaDypq4P5cuDHbuKeG"
+_OPENAI_ADMIN_BODY = "OYh8ozcxZzb-vq8fTGSha75cs2j7KTUKzHUh0Yck83WSzdUtmXO"
+
+
+class TestProviderFormatCoverage:
+    """Regressions for formats that real providers issue but the patterns
+    originally missed. Samples follow the shapes gitleaks validates against.
+    """
+
+    def test_stripe_live_and_prod_keys(self):
+        assert "stripe-secret-key" in rule_ids(oneleaks.scan("sk_live_" + _STRIPE_BODY))
+        assert "stripe-restricted-key" in rule_ids(oneleaks.scan("rk_prod_" + _STRIPE_BODY))
+
+    def test_stripe_test_keys_are_found_but_ranked_lower(self):
+        # Real credentials, but they reach no real money, so they sit below
+        # the live keys rather than alongside them.
+        for prefix in ("sk_test_", "rk_test_"):
+            findings = oneleaks.scan(prefix + _STRIPE_BODY).findings
+            assert [f.rule_id for f in findings] == ["stripe-test-key"]
+            assert findings[0].severity == "medium"
+
+    def test_openai_admin_key(self):
+        assert rule_ids(oneleaks.scan("sk-admin-" + _OPENAI_ADMIN_BODY)) == ["openai-api-key"]
+
+    def test_openai_legacy_rule_does_not_double_report_admin_keys(self):
+        text = "sk-admin-" + _OPENAI_ADMIN_BODY
+        assert "openai-api-key-legacy" not in rule_ids(oneleaks.scan(text))
+
+    def test_heroku_key_in_either_case(self):
+        for uuid in (
+            "12345678-abcd-abcd-abcd-1234567890ab",
+            "12345678-ABCD-ABCD-ABCD-1234567890AB",
+        ):
+            assert "heroku-api-key" in rule_ids(oneleaks.scan(f"heroku_api_key = {uuid}"))
+
+
 class TestPGPPrivateKey:
     def test_detects_pgp_block(self):
         block = (
@@ -466,36 +513,6 @@ class TestPGPPrivateKey:
         )
         result = oneleaks.scan(block)
         assert "pem-private-key" not in rule_ids(result)
-
-
-class TestNewPIIRules:
-    def test_mac_address(self):
-        result = oneleaks.scan("device mac: AA:BB:CC:DD:EE:FF")
-        assert "mac-address" in rule_ids(result)
-
-    def test_mac_address_negative_malformed(self):
-        result = oneleaks.scan("device mac: AA:BB:CC:DD:EE")
-        assert "mac-address" not in rule_ids(result)
-
-    def test_imei_valid_checksum(self):
-        result = oneleaks.scan("imei: 490154203237518")
-        assert "imei" in rule_ids(result)
-
-    def test_imei_invalid_checksum(self):
-        result = oneleaks.scan("imei: 490154203237519")
-        assert "imei" not in rule_ids(result)
-
-    def test_bank_routing_number_with_keyword_and_valid_checksum(self):
-        result = oneleaks.scan("routing number: 021000021")
-        assert "bank-routing-number" in rule_ids(result)
-
-    def test_bank_routing_number_negative_without_keyword(self):
-        result = oneleaks.scan("id: 021000021")
-        assert "bank-routing-number" not in rule_ids(result)
-
-    def test_bank_routing_number_negative_invalid_checksum(self):
-        result = oneleaks.scan("routing number: 021000022")
-        assert "bank-routing-number" not in rule_ids(result)
 
 
 class TestPEMPrivateKey:
@@ -515,161 +532,3 @@ class TestConnectionString:
         assert len(findings) == 1
         f = findings[0]
         assert text[f.start : f.end] == "hunter2"
-
-
-class TestOverlapResolution:
-    def test_provider_pattern_wins_over_entropy(self):
-        # A real OpenAI-shaped key is also high-entropy. Only one finding
-        # (the provider-specific one) should survive for that span.
-        text = "sk-proj-abcdEFGH1234ijklMNOP5678"
-        result = oneleaks.scan(text)
-        spans_for_text = [f for f in result.findings if text[f.start : f.end] in text]
-        rule_ids_here = {f.rule_id for f in spans_for_text}
-        assert "openai-api-key" in rule_ids_here
-        assert "high-entropy-string" not in rule_ids_here
-
-
-class TestInlineSuppression:
-    def test_suppressed_line_produces_no_finding(self):
-        text = 'TOKEN = "fake-secret-value"  # oneleaks: allow\n'
-        result = oneleaks.scan(text)
-        assert result.safe
-
-    def test_rule_scoped_suppression(self):
-        text = 'TOKEN = "fake-secret-value"  # oneleaks: allow generic-secret\n'
-        result = oneleaks.scan(text)
-        assert result.safe
-
-    def test_rule_scoped_suppression_does_not_suppress_other_rules(self):
-        text = "OPENAI_API_KEY=sk-proj-" + "a" * 20 + "  # oneleaks: allow generic-secret\n"
-        result = oneleaks.scan(text)
-        assert "openai-api-key" in rule_ids(result)
-
-    def test_scoped_suppression_of_the_overlap_winner_lets_the_loser_surface(self):
-        # Regression test: suppression must run before overlap resolution.
-        # aws-access-key-id (priority 100) wins the overlap against
-        # generic-secret (priority 50) for this span. Scoping the allow
-        # comment to aws-access-key-id specifically must not silently drop
-        # the whole span. generic-secret should still fire in its place.
-        text = 'api_key = "AKIAABCDEFGHIJKLMNOP"  # oneleaks: allow aws-access-key-id\n'
-        result = oneleaks.scan(text)
-        assert rule_ids(result) == ["generic-secret"]
-
-
-class TestBytesInput:
-    def test_non_utf8_bytes_skipped_not_raised(self):
-        # Regression test: scan(bytes) used to unconditionally raise on
-        # undecodable input, unlike an equivalent binary file on disk (which
-        # is silently skipped). The two input forms must behave the same.
-        result = oneleaks.scan(b"\xff\xfe not utf8 \x00\x00\x00")
-        assert result.safe
-
-    def test_sanitize_bytes_still_raises(self):
-        from oneleaks.errors import ScanError
-        from oneleaks.sanitizer import sanitize
-
-        with pytest.raises(ScanError):
-            sanitize(b"\xff\xfe not utf8 \x00\x00\x00")
-
-
-class TestFileAndDirectoryScanning:
-    def test_scan_single_file(self, tmp_path: Path):
-        f = tmp_path / "config.py"
-        f.write_text("OPENAI_API_KEY = 'sk-proj-" + "a" * 20 + "'\n")
-        result = oneleaks.scan(f)
-        assert not result.safe
-        assert result.findings[0].path == str(f)
-
-    def test_scan_directory_aggregates_and_excludes_git(self, tmp_path: Path):
-        (tmp_path / ".git").mkdir()
-        (tmp_path / ".git" / "config").write_text("sk-proj-" + "a" * 20)
-        (tmp_path / "app.py").write_text("OPENAI_API_KEY = 'sk-proj-" + "a" * 20 + "'\n")
-        result = oneleaks.scan(tmp_path)
-        paths = {f.path for f in result.findings}
-        assert paths == {"app.py"}
-
-    def test_scan_directory_excludes_local_tool_caches(self, tmp_path: Path):
-        # .pytest_cache/.mypy_cache/.ruff_cache/.hypothesis are all gitignored,
-        # never committed, but a directory scan walks the real filesystem
-        # regardless of git status, so they need their own exclusion.
-        for cache_dir in (".pytest_cache", ".mypy_cache", ".ruff_cache", ".hypothesis"):
-            d = tmp_path / cache_dir
-            d.mkdir()
-            (d / "artifact.txt").write_text("sk-proj-" + "a" * 20)
-        (tmp_path / "app.py").write_text("x = 1\n")
-        result = oneleaks.scan(tmp_path)
-        assert result.safe
-
-    def test_binary_file_skipped(self, tmp_path: Path):
-        f = tmp_path / "binary.dat"
-        f.write_bytes(b"\x00\x01\x02sk-proj-" + b"a" * 20)
-        result = oneleaks.scan(f)
-        assert result.safe
-
-    def test_oversized_file_skipped(self, tmp_path: Path):
-        f = tmp_path / "big.txt"
-        f.write_text("sk-proj-" + "a" * 20)
-        result = oneleaks.scan(tmp_path / "big.txt")
-        # sanity: normally detected
-        assert not result.safe
-        # now confirm size limit actually filters via directory scan path
-        from oneleaks.rules import RuleRegistry
-
-        registry = RuleRegistry()
-        registry.load_builtin()
-        findings = __import__("oneleaks.scanner", fromlist=["_scan_file"])._scan_file(
-            f,
-            registry,
-            base=tmp_path,
-            max_file_size=1,
-            fingerprint_key=None,
-            disabled_rules=frozenset(),
-        )
-        assert findings == []
-
-
-class TestConfig:
-    def test_disabled_rule_is_skipped(self):
-        cfg = Config(disabled_rules=["openai-api-key"])
-        result = oneleaks.scan("sk-proj-" + "a" * 20, config=cfg)
-        assert "openai-api-key" not in rule_ids(result)
-
-    def test_pii_detector_disabled(self):
-        cfg = Config(pii={"email": False})
-        result = oneleaks.scan("contact me at alice@example.com", config=cfg)
-        assert "email" not in rule_ids(result)
-
-    def test_every_known_pii_type_actually_disables_its_rule(self):
-        # Regression: pii: {} used to validate against a hand-maintained set
-        # in config.py while scanner.py separately hand-maintained the
-        # type->rule_id map it disables by. If the two ever drifted, a type
-        # would pass validation and then silently no-op instead of disabling
-        # anything. Both are now derived from pii_rules.py's one source of
-        # truth, so this can't happen -- proven here for every known type,
-        # not just one.
-        from oneleaks import pii_rules
-
-        for pii_type in pii_rules.known_types():
-            cfg = Config(pii={pii_type: False})
-            registry = build_registry(None, cfg)
-            disabled = _disabled_rule_ids(cfg)
-            rule_id = pii_rules.type_to_rule_id()[pii_type]
-            assert rule_id in disabled, f"{pii_type} did not disable {rule_id}"
-            assert any(r.id == rule_id for r in registry.rules), f"{rule_id} not a real rule"
-
-    def test_allow_paths_drops_findings_from_matched_path(self, tmp_path: Path):
-        fixtures = tmp_path / "tests" / "fixtures"
-        fixtures.mkdir(parents=True)
-        (fixtures / "example.py").write_text("sk-proj-" + "a" * 20)
-        cfg = Config(allow_paths=["tests/fixtures/*"])
-        result = oneleaks.scan(tmp_path, config=cfg)
-        assert result.safe
-
-    def test_unknown_top_level_field_rejected(self):
-        import pytest
-
-        from oneleaks.config import parse_config
-        from oneleaks.errors import ConfigError
-
-        with pytest.raises(ConfigError):
-            parse_config("not_a_real_field: true\n")

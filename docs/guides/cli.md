@@ -32,7 +32,7 @@ oneleaks scan . --baseline .oneleaks-baseline.json                     # only re
 | `--json` | Emit machine-readable JSON instead of human-readable lines. |
 | `--fail-on {low,medium,high,critical}` | Only findings at or above this severity affect the exit code. Lower-severity findings still print/appear in output. |
 | `--config PATH` | Path to a `.oneleaks.yaml` config file. If omitted, `.oneleaks.yaml` in the current directory is auto-discovered. |
-| `--baseline PATH` | Only report findings not already recorded in this baseline file. Requires `ONELEAKS_FINGERPRINT_KEY` to be set. See [Baselines](configuration.md#baselines). |
+| `--baseline PATH` | Only report findings not already recorded in this baseline file. Requires `ONELEAKS_FINGERPRINT_KEY` to be set. See [Baselines](../getting-started/configuration.md#baselines). |
 | `--update-baseline` | With `--baseline`: overwrite it with this run's findings instead of filtering against it. |
 
 ### Git history scanning
@@ -54,7 +54,7 @@ History findings carry a `commit` field naming the commit that introduced the se
 
 **Only added lines are scanned**, per commit diff, not whole files at every commit. A file touched 50 times isn't read 50 times over.
 
-Multi-line formats like PEM keys still match correctly, because each hunk's added lines are joined into one block before scanning. See [why that join matters](architecture.md#git-history-scanning).
+Multi-line formats like PEM keys still match correctly, because each hunk's added lines are joined into one block before scanning. See [why that join matters](../advanced/architecture.md#git-history-scanning).
 
 ### Exit codes
 
@@ -125,3 +125,24 @@ Mismatches are tolerated in both directions rather than raising: placeholders mi
 |---|---|
 | `path` (positional) | Sanitized file to restore, or `-` for stdin. |
 | `--map PATH` (required) | Mapping file written by a prior `sanitize --map`. |
+
+
+## Triaging a noisy first run
+
+A first scan of an established repository reports everything at once. Narrow it rather than turning rules off:
+
+```bash
+oneleaks scan . --category secret     # credentials only
+oneleaks scan . --severity high       # high and critical only
+oneleaks scan . --category secret --severity high
+```
+
+`--category` and `--severity` drop findings outright, so the output, `--json` and the exit code all agree. `--fail-on` is different: it leaves the output alone and only decides the exit code.
+
+`email` is on by default and is usually the biggest source of noise, because
+contributor lists and commit messages are full of addresses that were published
+on purpose. It stays on because a tool that ships with PII detection
+switched off is not a PII scanner. It is `low` severity, so
+`--severity medium` clears it, and `--category secret` is the usual answer.
+
+For findings you have reviewed and accepted, use a [baseline](../getting-started/configuration.md#baselines) rather than disabling the rule.
