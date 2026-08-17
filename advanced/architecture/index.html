@@ -1,0 +1,1676 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A lightweight, pure-Python sensitive-data scanner and sanitizer">
+      
+      
+      
+        <link rel="canonical" href="https://oneleaks.readthedocs.io/advanced/architecture/">
+      
+      
+        <link rel="prev" href="../../guides/mcp/">
+      
+      
+        <link rel="next" href="../concepts/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How Scanning & Sanitization Work - oneleaks</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-scanning-sanitization-work" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="oneleaks" class="md-header__button md-logo" aria-label="oneleaks" data-md-component="logo">
+      
+  <img src="../../assets/mark-on-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            oneleaks
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How Scanning & Sanitization Work
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/simjay/oneleaks" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    simjay/oneleaks
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="oneleaks" class="md-nav__button md-logo" aria-label="oneleaks" data-md-component="logo">
+      
+  <img src="../../assets/mark-on-dark.svg" alt="logo">
+
+    </a>
+    oneleaks
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/simjay/oneleaks" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    simjay/oneleaks
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/sanitization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sanitization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Scanning & Sanitization Work
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Scanning & Sanitization Work
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#secrets-and-pii-share-one-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets and PII share one pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-detection-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The detection pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The detection pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-candidate-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Candidate generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-disabled-rule-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Disabled-rule filtering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-suppression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Suppression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-overlap-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Overlap resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-finding-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Finding construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-config-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Config filters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fingerprinting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fingerprinting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reversing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reversing it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git-history-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git history scanning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#secrets-and-pii-share-one-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets and PII share one pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-detection-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The detection pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The detection pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-candidate-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Candidate generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-disabled-rule-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Disabled-rule filtering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-suppression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Suppression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-overlap-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Overlap resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-finding-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Finding construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-config-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Config filters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fingerprinting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fingerprinting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reversing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reversing it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git-history-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git history scanning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#throughput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Throughput
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="how-scanning-sanitization-work">How Scanning &amp; Sanitization Work<a class="headerlink" href="#how-scanning-sanitization-work" title="Permanent link">&para;</a></h1>
+<p>What happens inside <code>scan()</code> and <code>sanitize()</code>, step by step, and why the steps
+run in that order.</p>
+<p>You do not need this to use oneleaks. If you just want to get going, start with
+the <a href="../../getting-started/quickstart/">Quickstart</a>.</p>
+<h2 id="secrets-and-pii-share-one-pipeline">Secrets and PII share one pipeline<a class="headerlink" href="#secrets-and-pii-share-one-pipeline" title="Permanent link">&para;</a></h2>
+<p>oneleaks scans for both in a single pass. There is no separate PII engine.</p>
+<p>What differs is not the machinery but the <strong>evidence</strong> each category can rely on.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Secrets</th>
+<th>PII</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rules</td>
+<td>65</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Anchored on a literal prefix</td>
+<td>53</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Confirmed by a checksum</td>
+<td>1</td>
+<td>7</td>
+</tr>
+<tr>
+<td>Usual severity</td>
+<td>high, critical</td>
+<td>low, medium</td>
+</tr>
+</tbody>
+</table>
+<p>The reason is that providers <em>want</em> their tokens found. AWS stamps <code>AKIA</code> on
+access keys and GitHub stamps <code>ghp_</code> on tokens, partly so scanners can spot a
+leak. A fixed prefix is strong evidence on its own.</p>
+<p>Nobody stamps a prefix on a credit card number. PII has to be confirmed another
+way, usually by a checksum such as Luhn or Mod-97, or by a complete structural
+shape like an IPv4 address.</p>
+<p>Severity follows from that. A leaked AWS key is actionable immediately, so secret
+rules sit at high or critical. An email address in a log file is a privacy
+concern rather than an emergency, so most PII rules sit at low or
+medium.</p>
+<div class="admonition info">
+<p class="admonition-title">Where this lives in the code</p>
+<p><code>secret_rules.py</code> and <code>pii_rules.py</code> are peer modules, one per category.
+Each owns loading its own rule file, and nothing else.</p>
+<p>Everything downstream is category-agnostic. Matching, validation and
+overlap resolution never branch on whether a rule is a secret or PII rule.</p>
+<p>They cannot be split further, because overlap resolution needs candidates
+from both categories in one pool. A connection-string password can look
+exactly like an email address.</p>
+</div>
+<h2 id="the-detection-pipeline">The detection pipeline<a class="headerlink" href="#the-detection-pipeline" title="Permanent link">&para;</a></h2>
+<p>Every scan runs the same six stages, whether the input is text, a file, a
+directory, or a git diff hunk. The code is <code>scanner.py::scan_text()</code>.</p>
+<pre class="mermaid"><code>flowchart TD
+    A[Input text] --&gt; B[1 · Candidate generation]
+    B --&gt; C[2 · Disabled-rule filtering]
+    C --&gt; D[3 · Suppression&lt;br/&gt;#35; oneleaks: allow]
+    D --&gt; E[4 · Overlap resolution]
+    E --&gt; F[5 · Finding construction&lt;br/&gt;preview + fingerprint]
+    F --&gt; G[6 · Config filters&lt;br/&gt;severity_overrides, allow.paths]
+    G --&gt; H[Findings]</code></pre>
+<h3 id="1-candidate-generation">1. Candidate generation<a class="headerlink" href="#1-candidate-generation" title="Permanent link">&para;</a></h3>
+<p>Four detectors run independently over the input. Each returns raw
+<code>RuleMatch(start, end)</code> spans, before any filtering or ranking.</p>
+<table>
+<thead>
+<tr>
+<th>Detector</th>
+<th>What it matches</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Regex rules</strong></td>
+<td>Built-in and custom rules with a <code>pattern</code></td>
+<td><code>regex_candidates()</code></td>
+</tr>
+<tr>
+<td><strong>Generic assignment</strong></td>
+<td><code>password = "..."</code>, <code>api_key: ...</code>, <code>TOKEN=...</code></td>
+<td><code>generic_assignment_candidates()</code></td>
+</tr>
+<tr>
+<td><strong>Entropy</strong></td>
+<td>Base64-alphabet runs of 20 to 100 chars, high Shannon entropy</td>
+<td><code>entropy_candidates()</code></td>
+</tr>
+<tr>
+<td><strong>Your own code</strong></td>
+<td>Whatever your <code>PythonRule.detect()</code> returns</td>
+<td>your code</td>
+</tr>
+</tbody>
+</table>
+<p>Two things worth knowing.</p>
+<p><strong>Keywords narrow matches, they do not find them.</strong> When a rule has <code>keywords</code>,
+a regex match only counts if one of those words appears within about 60
+characters before it on the same line. That lets <code>aws-secret-access-key</code> demand
+both a 40-character shape and nearby context.</p>
+<p><strong>Validators run straight away.</strong> A match with a <code>validator</code> is checked
+on the spot, and failures are dropped here rather than filtered out later. This
+is where most PII is confirmed.</p>
+<details class="note">
+<summary>Why oneleaks does not use a keyword prefilter</summary>
+<p>Some scanners run a fast keyword search first, then run the slower regex
+only on text that passed. It is a performance optimization for large
+repositories.</p>
+<p>oneleaks does the opposite. Every regex always runs over the whole input,
+and <code>keywords</code> is checked afterwards, against a window near a match that
+was already found.</p>
+<p>The tradeoff: oneleaks pays full regex cost regardless of keyword presence.
+In exchange the pipeline has no "did any keyword appear in this file" pass
+to keep correct.</p>
+</details>
+<h3 id="2-disabled-rule-filtering">2. Disabled-rule filtering<a class="headerlink" href="#2-disabled-rule-filtering" title="Permanent link">&para;</a></h3>
+<p>Rules switched off in <code>.oneleaks.yaml</code> are removed next, through
+<code>disabled_rules</code> or <code>pii: {&lt;type&gt;: false}</code>.</p>
+<p>This runs early on purpose, so a disabled rule never competes for a span in
+stage 4.</p>
+<h3 id="3-suppression">3. Suppression<a class="headerlink" href="#3-suppression" title="Permanent link">&para;</a></h3>
+<p>Inline <code># oneleaks: allow</code> comments are applied here, optionally scoped to one
+rule ID.</p>
+<div class="admonition warning">
+<p class="admonition-title">This stage must run before overlap resolution</p>
+<p>It used to run after, and that was a real bug. Take this line:</p>
+<div class="highlight"><pre><span></span><code><span class="n">api_key</span> <span class="o">=</span> <span class="s2">&quot;AKIAABCDEFGHIJKLMNOP&quot;</span>  <span class="c1"># oneleaks: allow aws-access-key-id</span>
+</code></pre></div>
+<p>Two rules match that span. <code>aws-access-key-id</code> has priority 100 and the
+generic-assignment rule has 50. Overlap resolution keeps only the winner.</p>
+<p>Suppressing after resolution meant the generic-assignment candidate was
+already gone. Removing the winner then left nothing, so a comment scoped to
+one rule silently suppressed the whole line.</p>
+<p>Suppressing first leaves the generic rule in the pool, free to win the span
+and still be reported.</p>
+</div>
+<h3 id="4-overlap-resolution">4. Overlap resolution<a class="headerlink" href="#4-overlap-resolution" title="Permanent link">&para;</a></h3>
+<p>One value often matches several rules. An OpenAI key is both
+<code>openai-api-key</code>-shaped and high-entropy.</p>
+<p><code>_resolve_overlaps()</code> sorts every surviving candidate by <code>(priority desc, span
+length desc, start, rule ID)</code>. It walks that order and accepts any candidate not
+overlapping one already accepted. Highest priority wins a contested span.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Priority</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Structural anchor</td>
+<td>110</td>
+<td>PEM, JWT, connection string</td>
+</tr>
+<tr>
+<td>Provider-specific</td>
+<td>90 to 100</td>
+<td>AWS, GitHub, OpenAI</td>
+</tr>
+<tr>
+<td>Keyword-anchored generic</td>
+<td>70</td>
+<td>Datadog, Azure</td>
+</tr>
+<tr>
+<td>Generic assignment</td>
+<td>50</td>
+<td><code>password = ...</code></td>
+</tr>
+<tr>
+<td>Entropy only</td>
+<td>10</td>
+<td>high-entropy string</td>
+</tr>
+</tbody>
+</table>
+<p>Structural anchors outrank provider patterns for a concrete reason. A
+connection-string password can look like an email's <code>local@domain</code> shape. The
+more structurally specific match should win regardless of span length.</p>
+<p>This is also the stage that requires secrets and PII to stay in one pool.
+Splitting them into separate pipelines would let both claim the same span.</p>
+<h3 id="5-finding-construction">5. Finding construction<a class="headerlink" href="#5-finding-construction" title="Permanent link">&para;</a></h3>
+<p>Each surviving candidate becomes a <code>Finding</code> carrying line and column, a masked
+<code>preview</code>, and a <code>fingerprint</code>.</p>
+<p>Previews are type-specific. Email becomes <code>a***@example.com</code>, and a private key
+becomes <code>&lt;PRIVATE_KEY&gt;</code>.</p>
+<p><strong>A <code>Finding</code> never holds the raw value.</strong></p>
+<h3 id="6-config-filters">6. Config filters<a class="headerlink" href="#6-config-filters" title="Permanent link">&para;</a></h3>
+<p>Finally <code>_apply_config_filters()</code> applies two things from <code>.oneleaks.yaml</code>:</p>
+<ul>
+<li><code>severity_overrides</code> swaps a finding's severity</li>
+<li><code>allow.paths</code> drops findings under matching paths entirely</li>
+</ul>
+<details class="note">
+<summary>Why every entry point shares one function</summary>
+<p>Config filtering runs through a single shared function,
+<code>scan_text_with_config()</code>, used identically by <code>scan()</code>, all three
+<code>git.scan_*()</code> functions, and <code>sanitize()</code>.</p>
+<p>Each of those once applied config itself, and each shipped with a different
+piece missing. Both <code>git.py</code> and <code>sanitize()</code> went out without
+<code>allow.paths</code> support at some point.</p>
+<p>One shared function means that class of bug cannot reappear at a fourth
+call site.</p>
+</details>
+<h2 id="fingerprinting">Fingerprinting<a class="headerlink" href="#fingerprinting" title="Permanent link">&para;</a></h2>
+<p>A fingerprint identifies a value without storing it:</p>
+<div class="highlight"><pre><span></span><code>HMAC-SHA256(key, rule_id + &quot;:&quot; + normalized_value)
+</code></pre></div>
+<p>The result is truncated and prefixed by category: <code>sec_</code>, <code>pii_</code>, <code>sen_</code>, or
+<code>fnd_</code> for a custom Python rule with a non-standard category.</p>
+<p>The key is picked in this order:</p>
+<ol>
+<li>An explicit key passed by the caller</li>
+<li>The <code>ONELEAKS_FINGERPRINT_KEY</code> environment variable</li>
+<li>A random 32-byte key, generated once per process</li>
+</ol>
+<div class="admonition info">
+<p class="admonition-title">Why HMAC instead of a plain hash</p>
+<p>It matters most for PII, because PII values are often low-entropy.</p>
+<p>There are only about 10 billion possible SSNs. That makes <code>sha256(ssn)</code>
+reversible: an attacker hashes all of them once and builds a lookup table.</p>
+<p>A secret key defeats that, as long as the key never travels alongside the
+fingerprints it produced. The same risk applies to
+<a href="../../guides/sanitization/#the-mapping-file-is-a-vault-not-a-log">mapping files</a>.</p>
+</div>
+<h2 id="sanitization">Sanitization<a class="headerlink" href="#sanitization" title="Permanent link">&para;</a></h2>
+<p><code>sanitize()</code> reuses <code>scan()</code>'s findings. It is not a second detection system.</p>
+<p><strong>1. Assign placeholders.</strong> Each finding gets <code>&lt;TYPE_N&gt;</code>, where <code>TYPE</code> is its
+type uppercased and <code>N</code> counts up per type.</p>
+<p>Before assigning a new number, oneleaks checks the finding's fingerprint against
+ones already seen. A repeated value reuses its placeholder.</p>
+<p>That is why <code>alice@example.com</code> appearing three times becomes <code>&lt;EMAIL_1&gt;</code> all
+three times, rather than <code>&lt;EMAIL_1&gt;</code>, <code>&lt;EMAIL_2&gt;</code>, <code>&lt;EMAIL_3&gt;</code>. Passing
+<code>seed_mapping</code> extends that across separate calls.</p>
+<p><strong>2. Replace right to left.</strong> Findings are replaced in descending order of start
+offset.</p>
+<p>This is the only order safe without recomputing offsets after every
+substitution. Replacing an earlier span shifts the position of everything after
+it. Working backwards means each replacement only touches text already
+processed.</p>
+<p><strong>3. Build the mapping, only if asked.</strong> With <code>reveal=True</code>, each placeholder
+records a <code>MappingEntry(value, rule_id, fingerprint)</code>. Otherwise this step
+is skipped and <code>result.mapping</code> stays <code>None</code>.</p>
+<p>This is the one deliberate exception to "never return raw values by default". See <a href="../../guides/sanitization/">Sanitization</a> for how to handle that mapping
+safely.</p>
+<h3 id="reversing-it">Reversing it<a class="headerlink" href="#reversing-it" title="Permanent link">&para;</a></h3>
+<p><code>desanitize()</code> is a plain string replace, one per mapping entry.</p>
+<p>Unmatched placeholders are left alone rather than raising, in both directions.
+Sanitized text often passes through an LLM before coming back, and the model may
+not echo every placeholder verbatim.</p>
+<h2 id="git-history-scanning">Git history scanning<a class="headerlink" href="#git-history-scanning" title="Permanent link">&para;</a></h2>
+<p><code>git.scan_history()</code> finds secrets that were committed and later removed.
+Scanning current content can never do that.</p>
+<p>Rescanning every file at every commit would work, but it is wasteful. A file
+touched 50 times would be read 50 times in full.</p>
+<p>Instead <code>_commit_diff_hunks()</code> parses <code>git diff --unified=0</code> per commit and
+keeps only the added lines, grouped by hunk. Each hunk's added lines are joined
+into one blob and run through the normal pipeline.</p>
+<div class="admonition important">
+<p class="admonition-title">Joining a hunk into one blob is correctness, not optimization</p>
+<p>Scanning added lines one at a time would break multi-line formats.</p>
+<p>A PEM private key's <code>-----BEGIN-----</code> and <code>-----END-----</code> markers sit many
+lines apart. Scanned as isolated strings, the two markers never appear in
+the same text, so the regex can never match across them.</p>
+<p>Joining preserves that adjacency while still only scanning what the commit
+actually introduced.</p>
+</div>
+<p>Line numbers are then translated from hunk-relative back to file-relative using
+the hunk header, and stamped with the commit SHA that introduced them
+(<code>Finding.commit</code>).</p>
+<h2 id="throughput">Throughput<a class="headerlink" href="#throughput" title="Permanent link">&para;</a></h2>
+<p>oneleaks scans at roughly <strong>1 MB/s</strong>. Nearly all of that is the provider rules:
+each one is an independent regex pass over the text, so the cost is flat per
+rule and grows linearly as rules are added. Entropy and generic-assignment
+detection are an order of magnitude cheaper and are not the bottleneck.</p>
+<p>Two obvious speed-ups were measured and rejected:</p>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Skip rules whose literal anchor is absent from the text</td>
+<td>1.3x. Only about half the rules have a usable anchor, and the ones without are the expensive ones.</td>
+</tr>
+<tr>
+<td>Combine every rule into one alternation with named groups</td>
+<td><strong>3x slower.</strong> Python's backtracking engine handles a large alternation badly.</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>re2</code> backend would fix it and is deliberately not used: it is a compiled
+dependency, and running anywhere Python runs with no binary is the point.</p>
+<p>In practice this only matters in one place:</p>
+<table>
+<thead>
+<tr>
+<th>Use case</th>
+<th>Input</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pre-commit hook, agent tool output, <code>scan_changed()</code></td>
+<td>kilobytes</td>
+<td>none</td>
+</tr>
+<tr>
+<td>full directory scan</td>
+<td>a few MB</td>
+<td>seconds</td>
+</tr>
+<tr>
+<td><code>scan_history()</code></td>
+<td>every commit</td>
+<td>roughly 60 ms per commit</td>
+</tr>
+</tbody>
+</table>
+<p>History scanning is the case to plan for. The 5000-commit default cap works out
+to about five minutes; use <code>--since</code> or <code>--max-commits</code> to bound it.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../concepts/">Concepts</a>, for the reasoning behind these choices</li>
+<li><a href="../../guides/sanitization/">Sanitization</a>, for putting values back later</li>
+<li><a href="../../guides/rules/">Custom Rules</a>, for the rule format and priorities</li>
+<li><a href="../../guides/cli/#git-history-scanning">CLI Reference</a>, for the <code>--history</code> options</li>
+</ul>
+<p>Where the code lives:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Job</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scanner.py</code></td>
+<td>Finding things: candidates, overlaps, <code>scan_text()</code>, walking a folder, <code>scan()</code></td>
+</tr>
+<tr>
+<td><code>detectors.py</code></td>
+<td>What counts as a match: regex, entropy, generic assignments</td>
+</tr>
+<tr>
+<td><code>skip_rules.py</code></td>
+<td>Which rules get switched off in which kinds of file</td>
+</tr>
+<tr>
+<td><code>reading.py</code></td>
+<td>Turning bytes on disk into text: binary check, encodings</td>
+</tr>
+<tr>
+<td><code>findings.py</code></td>
+<td>Turning a match into something safe to show: fingerprints, previews</td>
+</tr>
+<tr>
+<td><code>validators.py</code></td>
+<td>The checksum and structural checks a match must also pass</td>
+</tr>
+<tr>
+<td><code>sanitizer.py</code></td>
+<td>Redaction, tokenization and reversal</td>
+</tr>
+<tr>
+<td><code>git.py</code></td>
+<td>Changed, staged and committed content</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
